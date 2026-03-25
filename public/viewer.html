@@ -92,14 +92,25 @@
     }
     #videoOverlay svg { width: 56px; height: 56px; opacity: .25; }
 
-    .fullscreen-btn {
+    .video-btns {
       position: absolute; bottom: 14px; right: 14px;
-      background: rgba(0,0,0,.6); border: 1px solid var(--border);
+      display: flex; gap: 8px;
+    }
+    .video-btn {
+      background: rgba(0,0,0,.65); border: 1px solid var(--border);
       border-radius: 6px; padding: 6px 10px; color: var(--text);
       cursor: pointer; font-size: 0.75rem; transition: all .2s;
       display: flex; align-items: center; gap: 5px;
     }
-    .fullscreen-btn:hover { background: rgba(124,58,237,.4); border-color: var(--accent); }
+    .video-btn:hover { background: rgba(124,58,237,.4); border-color: var(--accent); }
+    .video-btn.pip-active { border-color: var(--green); color: var(--green); }
+
+    /* PiP banner — shown when page is hidden but PiP is not supported */
+    #pipBanner {
+      display: none; position: fixed; top: 0; left: 0; right: 0;
+      background: rgba(124,58,237,.95); color: #fff; text-align: center;
+      padding: 10px; font-size: 0.82rem; font-weight: 600; z-index: 200;
+    }
 
     /* ── CHAT ── */
     .chat-panel {
@@ -216,10 +227,16 @@
         <span>Aguardando stream do host...</span>
       </div>
       <video id="remoteVideo" autoplay playsinline></video>
-      <button class="fullscreen-btn" onclick="toggleFullscreen()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
-        Tela cheia
-      </button>
+      <div class="video-btns">
+        <button id="pipBtn" class="video-btn" onclick="togglePiP()" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><rect x="2" y="3" width="20" height="14" rx="2"/><rect x="13" y="9" width="8" height="6" rx="1"/></svg>
+          Pip
+        </button>
+        <button class="video-btn" onclick="toggleFullscreen()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+          Tela cheia
+        </button>
+      </div>
     </div>
 
     <!-- CHAT -->
@@ -240,6 +257,8 @@
   </div>
 </div>
 
+<div id="pipBanner">Live continua rodando em segundo plano ▶</div>
+
 <!-- STREAM ENDED -->
 <div id="endedOverlay">
   <h2>Live Encerrada</h2>
@@ -253,6 +272,7 @@
   let username = null;
   let hostId = null;
   let pc = null;
+  let wakeLock = null;
 
   const ICE_CONFIG = {
     iceServers: [
@@ -303,6 +323,14 @@
       if (video.srcObject !== e.streams[0]) {
         video.srcObject = e.streams[0];
         document.getElementById('videoOverlay').style.display = 'none';
+
+        // Show PiP button if supported
+        if (document.pictureInPictureEnabled) {
+          document.getElementById('pipBtn').style.display = 'flex';
+        }
+
+        // Request Wake Lock so screen doesn't sleep
+        requestWakeLock();
       }
     };
 
@@ -384,6 +412,63 @@
     document.getElementById('endedOverlay').classList.add('show');
     if (pc) pc.close();
   });
+
+  // ── PICTURE-IN-PICTURE ────────────────────────────────────────────────────
+  async function togglePiP() {
+    const video = document.getElementById('remoteVideo');
+    const btn   = document.getElementById('pipBtn');
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+        btn.classList.remove('pip-active');
+        btn.querySelector('svg+*') && (btn.childNodes[1].textContent = ' Pip');
+      } else {
+        await video.requestPictureInPicture();
+        btn.classList.add('pip-active');
+      }
+    } catch(e) {
+      console.warn('PiP error:', e);
+    }
+  }
+
+  // Auto-enter PiP when user minimizes / switches tab
+  document.addEventListener('visibilitychange', async () => {
+    const video = document.getElementById('remoteVideo');
+    if (!video.srcObject) return;
+
+    if (document.hidden) {
+      // Try PiP
+      if (document.pictureInPictureEnabled && !document.pictureInPictureElement) {
+        try {
+          await video.requestPictureInPicture();
+        } catch(e) {
+          // PiP blocked — show banner instead
+          document.getElementById('pipBanner').style.display = 'block';
+        }
+      }
+    } else {
+      document.getElementById('pipBanner').style.display = 'none';
+      // Re-acquire wake lock after returning
+      requestWakeLock();
+    }
+  });
+
+  // Exit PiP event
+  document.addEventListener('leavepictureinpicture', () => {
+    document.getElementById('pipBtn').classList.remove('pip-active');
+  });
+
+  // ── WAKE LOCK ─────────────────────────────────────────────────────────────
+  async function requestWakeLock() {
+    if (!('wakeLock' in navigator)) return;
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      // Re-request if released (e.g. tab switch)
+      wakeLock.addEventListener('release', () => {
+        if (!document.hidden) requestWakeLock();
+      });
+    } catch(e) { /* not supported or denied */ }
+  }
 
   // ── FULLSCREEN ────────────────────────────────────────────────────────────
   function toggleFullscreen() {

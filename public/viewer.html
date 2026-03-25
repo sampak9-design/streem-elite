@@ -148,6 +148,8 @@
       display: flex; align-items: center; justify-content: center; gap: 12px;
       padding: 12px 16px; background: var(--surface); border-top: 1px solid var(--border);
       flex-shrink: 0;
+      /* always on top of chat */
+      position: relative; z-index: 40;
     }
     .ctrl-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
     .ctrl-btn {
@@ -258,11 +260,11 @@
       .video-area { flex: none; width: 100%; aspect-ratio: 16/9; }
       #remoteVideo { height: 100%; }
 
-      /* chat slides up from above the bottom bar */
+      /* chat slides up — stops exactly above the bottom bar */
       .chat-panel {
         width: 100%; border-left: none; border-top: 1px solid var(--border); flex: 1;
-        position: fixed; bottom: 76px; left: 0; right: 0; height: 55vh;
-        z-index: 20; transform: translateY(110%); transition: transform .3s ease;
+        position: fixed; bottom: 72px; left: 0; right: 0; height: 55vh;
+        z-index: 20; transform: translateY(calc(100% + 72px)); transition: transform .3s ease;
         border-radius: 16px 16px 0 0; box-shadow: 0 -8px 40px rgba(0,0,0,.5);
       }
       .chat-panel.open { transform: translateY(0); }

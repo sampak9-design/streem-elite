@@ -120,18 +120,6 @@
       padding: 10px; font-size: 0.82rem; font-weight: 600; z-index: 200;
     }
 
-    /* Auto-PiP primer overlay */
-    #pipPrimer {
-      display: none; position: absolute; inset: 0;
-      background: rgba(0,0,0,.7); backdrop-filter: blur(2px);
-      align-items: center; justify-content: center; z-index: 10;
-      flex-direction: column; gap: 12px; cursor: pointer;
-    }
-    #pipPrimer.show { display: flex; }
-    #pipPrimer .pip-icon { width: 48px; height: 48px; color: var(--accent2); animation: bob .8s ease-in-out infinite alternate; }
-    @keyframes bob { from{transform:translateY(0)} to{transform:translateY(-6px)} }
-    #pipPrimer p { color: #fff; font-size: 0.9rem; font-weight: 600; text-align: center; max-width: 220px; line-height: 1.5; }
-    #pipPrimer small { color: rgba(255,255,255,.55); font-size: 0.75rem; }
 
     /* ── CHAT ── */
     .chat-panel {
@@ -345,17 +333,7 @@
       </div>
       <video id="remoteVideo" autoplay playsinline></video>
 
-      <!-- tap-to-enable auto-PiP -->
-      <div id="pipPrimer" onclick="primePiP()">
-        <svg class="pip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-          <rect x="2" y="3" width="20" height="14" rx="2"/>
-          <rect x="13" y="9" width="8" height="6" rx="1"/>
-        </svg>
-        <p>Toque aqui para habilitar PiP automático</p>
-        <small>O vídeo vai flutuar quando você minimizar</small>
-      </div>
-
-      <div class="video-btns">
+<div class="video-btns">
         <button id="pipBtn" class="video-btn" onclick="togglePiP()" style="display:none">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><rect x="2" y="3" width="20" height="14" rx="2"/><rect x="13" y="9" width="8" height="6" rx="1"/></svg>
           Pip
@@ -451,7 +429,7 @@
   let hostId = null;
   let pc = null;
   let wakeLock    = null;
-  let pipPrimed   = false;
+  let pipPrimed   = true; // user already interacted by joining the room
   let chatOpen    = false;
   let unreadCount = 0;
   let viewerMicStream = null;
@@ -510,11 +488,8 @@
         video.srcObject = e.streams[0];
         document.getElementById('videoOverlay').style.display = 'none';
 
-        // Show PiP button if supported
         if (document.pictureInPictureEnabled) {
           document.getElementById('pipBtn').style.display = 'flex';
-          // Show primer overlay so user taps once to unlock auto-PiP
-          document.getElementById('pipPrimer').classList.add('show');
         }
 
         // Request Wake Lock so screen doesn't sleep
@@ -611,23 +586,7 @@
 
   // ── PICTURE-IN-PICTURE ────────────────────────────────────────────────────
 
-  // Called on first tap — unlocks auto-PiP for the rest of the session
-  async function primePiP() {
-    const video = document.getElementById('remoteVideo');
-    document.getElementById('pipPrimer').classList.remove('show');
-    try {
-      await video.requestPictureInPicture();
-      // Enter and immediately leave — just to "prime" the permission
-      setTimeout(() => {
-        if (document.pictureInPictureElement) document.exitPictureInPicture();
-      }, 400);
-      pipPrimed = true;
-    } catch(e) {
-      pipPrimed = true; // still mark as primed, try anyway later
-    }
-  }
-
-  async function togglePiP() {
+async function togglePiP() {
     const video = document.getElementById('remoteVideo');
     const btn   = document.getElementById('pipBtn');
     try {

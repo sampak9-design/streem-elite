@@ -7,40 +7,36 @@
   <script src="/socket.io/socket.io.js"></script>
   <style>
     :root {
-      --bg:       #0a0a0f;
-      --surface:  #12121a;
-      --card:     #1a1a2e;
-      --border:   #2a2a3e;
-      --accent:   #7c3aed;
-      --accent2:  #a855f7;
-      --green:    #22c55e;
-      --red:      #ef4444;
-      --yellow:   #eab308;
-      --text:     #e2e8f0;
-      --muted:    #64748b;
-      --live:     #ff3b3b;
+      --bg:      #0a0a0f;
+      --surface: #12121a;
+      --card:    #1a1a2e;
+      --border:  #2a2a3e;
+      --accent:  #7c3aed;
+      --accent2: #a855f7;
+      --green:   #22c55e;
+      --red:     #ef4444;
+      --yellow:  #eab308;
+      --text:    #e2e8f0;
+      --muted:   #64748b;
+      --live:    #ff3b3b;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
-    /* ── TOP BAR ── */
     .topbar {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
+      padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0;
     }
     .topbar .logo { font-size: 1.1rem; font-weight: 700; color: var(--accent2); letter-spacing: 1px; }
     .status-badge {
       display: flex; align-items: center; gap: 8px;
       padding: 5px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 700;
-      background: var(--card); border: 1px solid var(--border); color: var(--muted);
-      transition: all .3s;
+      background: var(--card); border: 1px solid var(--border); color: var(--muted); transition: all .3s;
     }
     .status-badge.live { background: rgba(255,59,59,.15); border-color: var(--live); color: var(--live); }
     .status-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
     .status-badge.live .dot { background: var(--live); animation: pulse 1s infinite; }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
-
     .topbar-right { display: flex; align-items: center; gap: 12px; }
     .stat-pill {
       display: flex; align-items: center; gap: 6px;
@@ -50,14 +46,9 @@
     .stat-pill svg { width: 14px; height: 14px; }
     .stat-pill .val { font-weight: 700; color: var(--accent2); }
 
-    /* ── MAIN LAYOUT ── */
     .main { display: flex; flex: 1; overflow: hidden; }
 
-    /* ── LEFT: PREVIEW + CONTROLS ── */
-    .left-panel {
-      flex: 1; display: flex; flex-direction: column; gap: 12px;
-      padding: 16px; overflow-y: auto;
-    }
+    .left-panel { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 16px; overflow-y: auto; }
 
     .preview-wrapper {
       position: relative; background: #000; border-radius: 12px;
@@ -65,13 +56,11 @@
       aspect-ratio: 16/9; width: 100%; max-height: 420px;
       display: flex; align-items: center; justify-content: center;
     }
-    #localVideo {
-      width: 100%; height: 100%; object-fit: contain; display: block;
-    }
+    #previewCanvas { width: 100%; height: 100%; object-fit: contain; display: block; }
     .preview-overlay {
       position: absolute; inset: 0; display: flex; flex-direction: column;
       align-items: center; justify-content: center; gap: 8px;
-      color: var(--muted); font-size: 0.9rem;
+      color: var(--muted); font-size: 0.9rem; pointer-events: none;
     }
     .preview-overlay svg { width: 48px; height: 48px; opacity: .3; }
     .preview-label {
@@ -81,63 +70,93 @@
     }
     .preview-label.live { color: var(--live); }
 
-    /* ── CONTROLS ── */
-    .controls-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    /* MIC INDICATOR */
+    .mic-indicator {
+      position: absolute; top: 10px; right: 10px;
+      background: rgba(0,0,0,.7); border-radius: 6px; padding: 4px 10px;
+      font-size: 0.72rem; display: none; align-items: center; gap: 5px;
+    }
+    .mic-indicator.active { display: flex; color: var(--green); }
+    .mic-indicator.muted  { display: flex; color: var(--red); }
+    .mic-bar { display: flex; gap: 2px; align-items: flex-end; height: 14px; }
+    .mic-bar span { width: 3px; background: var(--green); border-radius: 2px; transition: height .1s; }
+
+    .controls-row { display: flex; gap: 8px; flex-wrap: wrap; }
     .btn {
       display: flex; align-items: center; gap: 7px;
-      padding: 9px 18px; border-radius: 8px; font-size: 0.85rem; font-weight: 600;
+      padding: 8px 16px; border-radius: 8px; font-size: 0.83rem; font-weight: 600;
       border: 1px solid transparent; cursor: pointer; transition: all .2s;
     }
-    .btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+    .btn svg { width: 15px; height: 15px; flex-shrink: 0; }
     .btn-primary { background: var(--accent); color: #fff; }
     .btn-primary:hover { background: var(--accent2); }
     .btn-danger  { background: var(--red); color: #fff; }
-    .btn-danger:hover  { opacity: .85; }
+    .btn-danger:hover { opacity: .85; }
     .btn-ghost   { background: var(--card); border-color: var(--border); color: var(--text); }
     .btn-ghost:hover { border-color: var(--accent); color: var(--accent2); }
+    .btn-active  { background: var(--card); border-color: var(--green); color: var(--green); }
+    .btn-muted   { background: rgba(239,68,68,.1); border-color: var(--red); color: var(--red); }
     .btn:disabled { opacity: .4; cursor: not-allowed; }
 
-    /* ── SETUP PANEL (before going live) ── */
-    #setupPanel {
-      background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px;
+    /* MEDIA CONTROLS BAR */
+    .media-bar {
+      background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+      padding: 12px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
     }
+    .media-bar-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; flex-shrink: 0; }
+    .divider { width: 1px; height: 24px; background: var(--border); }
+
+    /* webcam position picker */
+    .cam-pos-label { font-size: 0.75rem; color: var(--muted); margin-right: 4px; }
+    .cam-pos-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+    .cam-pos-btn {
+      width: 22px; height: 16px; border-radius: 3px; border: 1px solid var(--border);
+      background: var(--surface); cursor: pointer; transition: all .15s;
+    }
+    .cam-pos-btn:hover { border-color: var(--accent); }
+    .cam-pos-btn.sel { border-color: var(--accent2); background: rgba(124,58,237,.3); }
+
+    /* cam size slider */
+    .slider-wrap { display: flex; align-items: center; gap: 8px; }
+    .slider-wrap label { font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
+    input[type=range] {
+      -webkit-appearance: none; width: 80px; height: 4px;
+      background: var(--border); border-radius: 2px; outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 14px; height: 14px;
+      border-radius: 50%; background: var(--accent2); cursor: pointer;
+    }
+
+    #setupPanel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
     #setupPanel h3 { font-size: 0.9rem; color: var(--muted); margin-bottom: 14px; text-transform: uppercase; letter-spacing: .5px; }
     .form-group { margin-bottom: 12px; }
     .form-group label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 5px; }
     .form-group input {
       width: 100%; background: var(--surface); border: 1px solid var(--border);
-      border-radius: 6px; padding: 8px 12px; color: var(--text); font-size: 0.9rem;
-      outline: none; transition: border .2s;
+      border-radius: 6px; padding: 8px 12px; color: var(--text); font-size: 0.9rem; outline: none; transition: border .2s;
     }
     .form-group input:focus { border-color: var(--accent); }
 
-    /* ── ROOM CODE ── */
-    #roomCodeCard {
-      display: none; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px;
-    }
+    #roomCodeCard { display: none; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
     .room-code-row { display: flex; align-items: center; gap: 10px; }
     .room-code {
       flex: 1; background: var(--surface); border: 1px dashed var(--accent);
       border-radius: 8px; padding: 10px 14px; font-size: 1.4rem; font-weight: 800;
       color: var(--accent2); letter-spacing: 4px; text-align: center;
     }
-    .copy-btn { padding: 8px 14px; font-size: 0.8rem; }
 
-    /* ── VIEWER LIST ── */
-    #viewerListCard {
-      background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px;
-    }
+    #viewerListCard { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
     #viewerListCard h3 { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 12px; }
-    #viewerList { display: flex; flex-direction: column; gap: 6px; max-height: 150px; overflow-y: auto; }
+    #viewerList { display: flex; flex-direction: column; gap: 6px; max-height: 140px; overflow-y: auto; }
     .viewer-item {
       display: flex; align-items: center; justify-content: space-between;
       background: var(--surface); border-radius: 6px; padding: 7px 10px; font-size: 0.82rem;
     }
     .viewer-item .vname { display: flex; align-items: center; gap: 8px; }
     .viewer-avatar {
-      width: 26px; height: 26px; border-radius: 50%;
-      background: var(--accent); display: flex; align-items: center; justify-content: center;
-      font-size: 0.7rem; font-weight: 700; color: #fff; flex-shrink: 0;
+      width: 26px; height: 26px; border-radius: 50%; background: var(--accent);
+      display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; color: #fff;
     }
     .kick-btn {
       padding: 3px 8px; font-size: 0.72rem; border-radius: 4px;
@@ -146,15 +165,10 @@
     }
     .kick-btn:hover { background: var(--red); color: #fff; }
 
-    /* ── RIGHT: CHAT ── */
-    .right-panel {
-      width: 320px; display: flex; flex-direction: column;
-      background: var(--surface); border-left: 1px solid var(--border);
-    }
+    .right-panel { width: 320px; display: flex; flex-direction: column; background: var(--surface); border-left: 1px solid var(--border); }
     .chat-header {
       padding: 14px 16px; border-bottom: 1px solid var(--border);
-      font-size: 0.8rem; font-weight: 700; text-transform: uppercase;
-      letter-spacing: .5px; color: var(--muted);
+      font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--muted);
       display: flex; align-items: center; gap: 8px;
     }
     .chat-header svg { width: 14px; height: 14px; }
@@ -164,13 +178,12 @@
     }
     .chat-msg {
       background: var(--card); border-radius: 8px; padding: 8px 10px;
-      font-size: 0.83rem; line-height: 1.4; border: 1px solid var(--border);
-      animation: msgIn .2s ease;
+      font-size: 0.83rem; line-height: 1.4; border: 1px solid var(--border); animation: msgIn .2s ease;
     }
     .chat-msg.host-msg { border-color: rgba(124,58,237,.4); background: rgba(124,58,237,.08); }
-    @keyframes msgIn { from { opacity:0; transform: translateY(4px); } to { opacity:1; transform: none; } }
+    @keyframes msgIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
     .msg-author { font-weight: 700; color: var(--accent2); font-size: 0.78rem; margin-bottom: 2px; }
-    .msg-author.is-host::after { content: ' HOST'; font-size: 0.65rem; background: var(--accent); color: #fff; border-radius: 3px; padding: 1px 4px; margin-left: 4px; vertical-align: middle; }
+    .msg-author.is-host::after { content: ' HOST'; font-size: 0.65rem; background: var(--accent); color: #fff; border-radius: 3px; padding: 1px 4px; margin-left: 4px; }
     .msg-time { float: right; font-size: 0.7rem; color: var(--muted); margin-left: 6px; }
     .pin-msg-btn {
       display: none; font-size: 0.7rem; padding: 2px 6px;
@@ -178,53 +191,33 @@
       color: var(--accent2); border-radius: 4px; cursor: pointer; margin-top: 4px;
     }
     .chat-msg:hover .pin-msg-btn { display: inline-block; }
-
     #pinnedMsg {
       display: none; padding: 8px 12px; background: rgba(124,58,237,.12);
-      border-left: 3px solid var(--accent); margin: 0 12px 8px; border-radius: 0 6px 6px 0;
-      font-size: 0.8rem;
+      border-left: 3px solid var(--accent); margin: 0 12px 8px; border-radius: 0 6px 6px 0; font-size: 0.8rem;
     }
     #pinnedMsg .pinned-label { font-size: 0.7rem; color: var(--accent2); font-weight: 700; margin-bottom: 3px; }
-
-    .chat-input-row {
-      padding: 12px; border-top: 1px solid var(--border);
-      display: flex; gap: 8px;
-    }
+    .chat-input-row { padding: 12px; border-top: 1px solid var(--border); display: flex; gap: 8px; }
     .chat-input-row input {
       flex: 1; background: var(--card); border: 1px solid var(--border);
-      border-radius: 6px; padding: 8px 12px; color: var(--text); font-size: 0.85rem; outline: none;
-      transition: border .2s;
+      border-radius: 6px; padding: 8px 12px; color: var(--text); font-size: 0.85rem; outline: none; transition: border .2s;
     }
     .chat-input-row input:focus { border-color: var(--accent); }
-    .send-btn {
-      padding: 8px 14px; background: var(--accent); border: none;
-      border-radius: 6px; color: #fff; cursor: pointer; transition: background .2s;
-    }
+    .send-btn { padding: 8px 14px; background: var(--accent); border: none; border-radius: 6px; color: #fff; cursor: pointer; }
     .send-btn:hover { background: var(--accent2); }
 
-    /* ── MODAL ── */
-    .modal-overlay {
-      display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7);
-      align-items: center; justify-content: center; z-index: 100;
-    }
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7); align-items: center; justify-content: center; z-index: 100; }
     .modal-overlay.open { display: flex; }
-    .modal {
-      background: var(--card); border: 1px solid var(--border); border-radius: 14px;
-      padding: 28px; width: 420px; max-width: 95vw;
-    }
+    .modal { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 28px; width: 420px; max-width: 95vw; }
     .modal h2 { font-size: 1.1rem; margin-bottom: 6px; }
     .modal p { color: var(--muted); font-size: 0.85rem; margin-bottom: 20px; }
     .modal-btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
 
-    /* ── SCROLLBAR ── */
     ::-webkit-scrollbar { width: 5px; }
-    ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
   </style>
 </head>
 <body>
 
-<!-- TOP BAR -->
 <div class="topbar">
   <div class="logo">⬡ STREEM ELITE</div>
   <div id="statusBadge" class="status-badge">
@@ -243,12 +236,10 @@
   </div>
 </div>
 
-<!-- MAIN -->
 <div class="main">
-  <!-- LEFT -->
   <div class="left-panel">
 
-    <!-- PREVIEW -->
+    <!-- PREVIEW (canvas) -->
     <div class="preview-wrapper">
       <div id="previewOverlay" class="preview-overlay">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -256,15 +247,33 @@
         </svg>
         <span>Nenhuma tela compartilhada</span>
       </div>
-      <video id="localVideo" autoplay muted playsinline></video>
+      <canvas id="previewCanvas"></canvas>
       <div id="previewLabel" class="preview-label">PREVIEW</div>
+      <div id="micIndicator" class="mic-indicator">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        <span id="micLabel">MIC</span>
+        <div class="mic-bar" id="micBar">
+          <span id="b1" style="height:4px"></span>
+          <span id="b2" style="height:4px"></span>
+          <span id="b3" style="height:4px"></span>
+          <span id="b4" style="height:4px"></span>
+        </div>
+      </div>
     </div>
 
-    <!-- CONTROLS -->
+    <!-- MAIN CONTROLS -->
     <div class="controls-row">
       <button id="btnShare" class="btn btn-ghost" onclick="startScreenShare()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-        Compartilhar Tela
+        Tela
+      </button>
+      <button id="btnWebcam" class="btn btn-ghost" onclick="toggleWebcam()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+        Webcam
+      </button>
+      <button id="btnMic" class="btn btn-ghost" onclick="toggleMic()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        Microfone
       </button>
       <button id="btnGoLive" class="btn btn-primary" onclick="goLive()" disabled>
         <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
@@ -272,7 +281,29 @@
       </button>
       <button id="btnEndLive" class="btn btn-danger" onclick="showEndModal()" style="display:none">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-        Encerrar Live
+        Encerrar
+      </button>
+    </div>
+
+    <!-- WEBCAM OPTIONS (shown when webcam is on) -->
+    <div id="webcamOptions" class="media-bar" style="display:none">
+      <span class="media-bar-label">Webcam</span>
+      <div class="divider"></div>
+      <span class="cam-pos-label">Posição:</span>
+      <div class="cam-pos-grid">
+        <button class="cam-pos-btn" title="Topo-Esq"  onclick="setCamPos('tl')"></button>
+        <button class="cam-pos-btn sel" title="Topo-Dir"  onclick="setCamPos('tr')"></button>
+        <button class="cam-pos-btn" title="Baixo-Esq" onclick="setCamPos('bl')"></button>
+        <button class="cam-pos-btn" title="Baixo-Dir" onclick="setCamPos('br')"></button>
+      </div>
+      <div class="divider"></div>
+      <div class="slider-wrap">
+        <label>Tamanho</label>
+        <input type="range" id="camSizeSlider" min="10" max="40" value="22" oninput="camSizePct=+this.value" />
+      </div>
+      <div class="divider"></div>
+      <button id="btnMirror" class="btn btn-ghost" style="padding:5px 10px;font-size:.75rem;" onclick="toggleMirror()">
+        Espelhar
       </button>
     </div>
 
@@ -287,16 +318,13 @@
 
     <!-- ROOM CODE -->
     <div id="roomCodeCard">
-      <div style="font-size:.8rem;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;">Código da Sala — Compartilhe com os Espectadores</div>
+      <div style="font-size:.8rem;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;">Código — Compartilhe com os Espectadores</div>
       <div class="room-code-row">
         <div class="room-code" id="roomCodeDisplay">—</div>
-        <button class="btn btn-ghost copy-btn" onclick="copyRoomCode()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-          Copiar
-        </button>
+        <button class="btn btn-ghost" style="padding:8px 14px;font-size:.8rem" onclick="copyRoomCode()">Copiar</button>
       </div>
       <div style="font-size:.75rem;color:var(--muted);margin-top:8px;">
-        Link direto: <span id="viewerLink" style="color:var(--accent2)"></span>
+        Link: <span id="viewerLink" style="color:var(--accent2)"></span>
       </div>
     </div>
 
@@ -310,7 +338,7 @@
 
   </div>
 
-  <!-- RIGHT: CHAT -->
+  <!-- CHAT -->
   <div class="right-panel">
     <div class="chat-header">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -330,7 +358,6 @@
   </div>
 </div>
 
-<!-- END MODAL -->
 <div class="modal-overlay" id="endModal">
   <div class="modal">
     <h2>Encerrar a Live?</h2>
@@ -342,15 +369,40 @@
   </div>
 </div>
 
+<!-- hidden video elements for canvas drawing -->
+<video id="screenVideo" autoplay muted playsinline style="display:none"></video>
+<video id="webcamVideo" autoplay muted playsinline style="display:none"></video>
+
 <script>
   const socket = io();
+  const canvas  = document.getElementById('previewCanvas');
+  const ctx     = canvas.getContext('2d');
+  const screenVid = document.getElementById('screenVideo');
+  const webcamVid = document.getElementById('webcamVideo');
+
   let roomId = null;
   let isLive = false;
-  let localStream = null;
-  let peerConnections = {}; // viewerId -> RTCPeerConnection
-  let viewers = {}; // viewerId -> { username }
+  let screenStream = null;
+  let webcamStream = null;
+  let micStream    = null;
+  let outputStream = null; // what viewers receive
+  let audioCtx     = null;
+  let micSource    = null;
+  let micAnalyser  = null;
+  let micMuted     = false;
+  let micGainNode  = null;
+  let webcamOn     = false;
+  let camPos       = 'br'; // tl tr bl br
+  let camSizePct   = 22;   // % of canvas width
+  let mirrorCam    = false;
+  let renderLoopId = null;
+  let peerConnections = {};
+  let viewers = {};
   let uptimeInterval = null;
-  let liveStartTime = null;
+  let liveStartTime  = null;
+
+  canvas.width  = 1280;
+  canvas.height = 720;
 
   const ICE_CONFIG = {
     iceServers: [
@@ -359,39 +411,244 @@
     ]
   };
 
-  // ── SCREEN SHARE ──────────────────────────────────────────────────────────
+  // ── CANVAS RENDER LOOP ────────────────────────────────────────────────────
+  function startRenderLoop() {
+    if (renderLoopId) return;
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (screenStream && screenVid.readyState >= 2) {
+        ctx.drawImage(screenVid, 0, 0, canvas.width, canvas.height);
+      } else {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+
+      if (webcamOn && webcamStream && webcamVid.readyState >= 2) {
+        const camW = Math.floor(canvas.width * camSizePct / 100);
+        const camH = Math.floor(camW * 9 / 16);
+        const pad  = 14;
+        let cx = 0, cy = 0;
+        if (camPos === 'tl') { cx = pad;                   cy = pad; }
+        if (camPos === 'tr') { cx = canvas.width - camW - pad; cy = pad; }
+        if (camPos === 'bl') { cx = pad;                   cy = canvas.height - camH - pad; }
+        if (camPos === 'br') { cx = canvas.width - camW - pad; cy = canvas.height - camH - pad; }
+
+        // shadow
+        ctx.shadowColor = 'rgba(0,0,0,.6)';
+        ctx.shadowBlur  = 12;
+
+        // rounded clip
+        const r = 8;
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(cx + r, cy);
+        ctx.lineTo(cx + camW - r, cy);
+        ctx.quadraticCurveTo(cx + camW, cy, cx + camW, cy + r);
+        ctx.lineTo(cx + camW, cy + camH - r);
+        ctx.quadraticCurveTo(cx + camW, cy + camH, cx + camW - r, cy + camH);
+        ctx.lineTo(cx + r, cy + camH);
+        ctx.quadraticCurveTo(cx, cy + camH, cx, cy + camH - r);
+        ctx.lineTo(cx, cy + r);
+        ctx.quadraticCurveTo(cx, cy, cx + r, cy);
+        ctx.closePath();
+        ctx.clip();
+
+        if (mirrorCam) {
+          ctx.save();
+          ctx.translate(cx + camW, cy);
+          ctx.scale(-1, 1);
+          ctx.drawImage(webcamVid, 0, 0, camW, camH);
+          ctx.restore();
+        } else {
+          ctx.drawImage(webcamVid, cx, cy, camW, camH);
+        }
+        ctx.restore();
+        ctx.shadowBlur = 0;
+
+        // border
+        ctx.strokeStyle = 'rgba(168,85,247,.7)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(cx, cy, camW, camH, r);
+        ctx.stroke();
+      }
+
+      renderLoopId = requestAnimationFrame(draw);
+    }
+    draw();
+  }
+
+  function stopRenderLoop() {
+    if (renderLoopId) { cancelAnimationFrame(renderLoopId); renderLoopId = null; }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  // ── AUDIO CONTEXT ─────────────────────────────────────────────────────────
+  function buildAudioPipeline() {
+    if (audioCtx) audioCtx.close();
+    audioCtx = new AudioContext();
+    const dest = audioCtx.createMediaStreamDestination();
+
+    // screen audio
+    if (screenStream) {
+      const at = screenStream.getAudioTracks();
+      if (at.length) {
+        audioCtx.createMediaStreamSource(new MediaStream(at)).connect(dest);
+      }
+    }
+
+    // mic audio
+    if (micStream) {
+      micSource  = audioCtx.createMediaStreamSource(micStream);
+      micGainNode = audioCtx.createGain();
+      micGainNode.gain.value = micMuted ? 0 : 1;
+      micAnalyser = audioCtx.createAnalyser();
+      micAnalyser.fftSize = 32;
+      micSource.connect(micGainNode);
+      micGainNode.connect(micAnalyser);
+      micGainNode.connect(dest);
+      startMicMeter();
+    }
+
+    return dest.stream.getAudioTracks();
+  }
+
+  function rebuildOutputStream() {
+    if (!screenStream) return;
+    const canvasTrack = canvas.captureStream(30).getVideoTracks()[0];
+    const audioTracks = buildAudioPipeline();
+    outputStream = new MediaStream([canvasTrack, ...audioTracks]);
+
+    // update existing peer connections
+    for (const [vid, pc] of Object.entries(peerConnections)) {
+      const senders = pc.getSenders();
+      const vSender = senders.find(s => s.track && s.track.kind === 'video');
+      const aSenders = senders.filter(s => s.track && s.track.kind === 'audio');
+      if (vSender) vSender.replaceTrack(canvasTrack);
+      audioTracks.forEach((at, i) => { if (aSenders[i]) aSenders[i].replaceTrack(at); });
+    }
+  }
+
+  // ── MIC METER ─────────────────────────────────────────────────────────────
+  function startMicMeter() {
+    if (!micAnalyser) return;
+    const data = new Uint8Array(micAnalyser.frequencyBinCount);
+    const bars = [document.getElementById('b1'), document.getElementById('b2'),
+                  document.getElementById('b3'), document.getElementById('b4')];
+    function tick() {
+      if (!micAnalyser) return;
+      micAnalyser.getByteFrequencyData(data);
+      const avg = data.slice(0,4).reduce((a,b)=>a+b,0) / 4;
+      bars.forEach((b, i) => {
+        b.style.height = Math.max(2, Math.min(14, (data[i]||avg) / 10)) + 'px';
+      });
+      requestAnimationFrame(tick);
+    }
+    tick();
+  }
+
+  // ── SCREEN SHARE ─────────────────────────────────────────────────────────
   async function startScreenShare() {
     try {
-      localStream = await navigator.mediaDevices.getDisplayMedia({
-        video: { frameRate: 30, cursor: 'always' },
-        audio: true
+      screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: 30, cursor: 'always' }, audio: true
       });
-      const video = document.getElementById('localVideo');
-      video.srcObject = localStream;
+      screenVid.srcObject = screenStream;
       document.getElementById('previewOverlay').style.display = 'none';
       document.getElementById('btnGoLive').disabled = false;
+      document.getElementById('btnShare').className = 'btn btn-active';
       document.getElementById('btnShare').innerHTML = `
-        <svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-        Tela Capturada ✓`;
-
-      localStream.getVideoTracks()[0].onended = () => stopScreenShare();
-    } catch (e) {
-      console.error(e);
-      alert('Permissão negada ou erro ao capturar tela.');
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        Tela ✓`;
+      screenStream.getVideoTracks()[0].onended = () => stopScreenShare();
+      startRenderLoop();
+      rebuildOutputStream();
+    } catch(e) {
+      alert('Erro ao capturar tela: ' + e.message);
     }
   }
 
   function stopScreenShare() {
-    if (localStream) {
-      localStream.getTracks().forEach(t => t.stop());
-      localStream = null;
-    }
-    document.getElementById('localVideo').srcObject = null;
+    if (screenStream) { screenStream.getTracks().forEach(t=>t.stop()); screenStream = null; }
+    screenVid.srcObject = null;
     document.getElementById('previewOverlay').style.display = 'flex';
     document.getElementById('btnGoLive').disabled = true;
+    document.getElementById('btnShare').className = 'btn btn-ghost';
     document.getElementById('btnShare').innerHTML = `
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-      Compartilhar Tela`;
+      Tela`;
+    stopRenderLoop();
+  }
+
+  // ── WEBCAM ────────────────────────────────────────────────────────────────
+  async function toggleWebcam() {
+    if (!webcamOn) {
+      try {
+        webcamStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        webcamVid.srcObject = webcamStream;
+        webcamOn = true;
+        document.getElementById('btnWebcam').className = 'btn btn-active';
+        document.getElementById('btnWebcam').innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+          Webcam ✓`;
+        document.getElementById('webcamOptions').style.display = 'flex';
+        if (!renderLoopId) startRenderLoop();
+      } catch(e) {
+        alert('Não foi possível acessar a webcam: ' + e.message);
+      }
+    } else {
+      if (webcamStream) { webcamStream.getTracks().forEach(t=>t.stop()); webcamStream = null; }
+      webcamVid.srcObject = null;
+      webcamOn = false;
+      document.getElementById('btnWebcam').className = 'btn btn-ghost';
+      document.getElementById('btnWebcam').innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+        Webcam`;
+      document.getElementById('webcamOptions').style.display = 'none';
+    }
+  }
+
+  function setCamPos(pos) {
+    camPos = pos;
+    document.querySelectorAll('.cam-pos-btn').forEach((b,i) => {
+      b.classList.toggle('sel', ['tl','tr','bl','br'][i] === pos);
+    });
+  }
+
+  function toggleMirror() {
+    mirrorCam = !mirrorCam;
+    document.getElementById('btnMirror').className = mirrorCam ? 'btn btn-active' : 'btn btn-ghost';
+    document.getElementById('btnMirror').style.cssText = 'padding:5px 10px;font-size:.75rem;';
+  }
+
+  // ── MICROPHONE ────────────────────────────────────────────────────────────
+  async function toggleMic() {
+    if (!micStream) {
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        micMuted = false;
+        document.getElementById('btnMic').className = 'btn btn-active';
+        document.getElementById('btnMic').innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          Mic ✓`;
+        document.getElementById('micIndicator').className = 'mic-indicator active';
+        document.getElementById('micLabel').textContent = 'MIC';
+        rebuildOutputStream();
+      } catch(e) {
+        alert('Não foi possível acessar o microfone: ' + e.message);
+      }
+    } else {
+      // toggle mute
+      micMuted = !micMuted;
+      if (micGainNode) micGainNode.gain.value = micMuted ? 0 : 1;
+      document.getElementById('btnMic').className = micMuted ? 'btn btn-muted' : 'btn btn-active';
+      document.getElementById('btnMic').innerHTML = micMuted
+        ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg> Mudo`
+        : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg> Mic ✓`;
+      document.getElementById('micIndicator').className = micMuted ? 'mic-indicator muted' : 'mic-indicator active';
+      document.getElementById('micLabel').textContent = micMuted ? 'MUDO' : 'MIC';
+    }
   }
 
   // ── GO LIVE ────────────────────────────────────────────────────────────────
@@ -400,10 +657,9 @@
     socket.emit('host:create', { title });
   }
 
-  socket.on('host:created', ({ roomId: id, title }) => {
+  socket.on('host:created', ({ roomId: id }) => {
     roomId = id;
     isLive = true;
-
     document.getElementById('roomCodeDisplay').textContent = id;
     const link = `${location.origin}/viewer.html?room=${id}`;
     document.getElementById('viewerLink').textContent = link;
@@ -411,29 +667,25 @@
     document.getElementById('setupPanel').style.display = 'none';
     document.getElementById('btnGoLive').style.display = 'none';
     document.getElementById('btnEndLive').style.display = 'flex';
-
-    const badge = document.getElementById('statusBadge');
-    badge.classList.add('live');
+    document.getElementById('statusBadge').classList.add('live');
     document.getElementById('statusText').textContent = 'AO VIVO';
     document.getElementById('previewLabel').className = 'preview-label live';
     document.getElementById('previewLabel').textContent = '● LIVE';
-
     liveStartTime = Date.now();
     document.getElementById('uptimePill').style.display = 'flex';
     uptimeInterval = setInterval(updateUptime, 1000);
   });
 
-  // ── NEW VIEWER → create offer ──────────────────────────────────────────────
+  // ── NEW VIEWER ────────────────────────────────────────────────────────────
   socket.on('viewer:new', async ({ viewerId, username, viewerCount }) => {
     viewers[viewerId] = { username };
     updateViewerCount(viewerCount);
     renderViewerList();
     addSystemMsg(`${username} entrou na live`);
+    if (!outputStream) return;
 
-    if (!localStream) return;
     const pc = createPeerConnection(viewerId);
-    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-
+    outputStream.getTracks().forEach(t => pc.addTrack(t, outputStream));
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     socket.emit('webrtc:offer', { targetId: viewerId, offer });
@@ -451,10 +703,7 @@
 
   socket.on('viewer:left', ({ viewerId, username, viewerCount }) => {
     delete viewers[viewerId];
-    if (peerConnections[viewerId]) {
-      peerConnections[viewerId].close();
-      delete peerConnections[viewerId];
-    }
+    if (peerConnections[viewerId]) { peerConnections[viewerId].close(); delete peerConnections[viewerId]; }
     updateViewerCount(viewerCount);
     renderViewerList();
     addSystemMsg(`${username} saiu da live`);
@@ -465,15 +714,11 @@
   function createPeerConnection(viewerId) {
     const pc = new RTCPeerConnection(ICE_CONFIG);
     peerConnections[viewerId] = pc;
-
     pc.onicecandidate = ({ candidate }) => {
       if (candidate) socket.emit('webrtc:ice', { targetId: viewerId, candidate });
     };
-
     pc.onconnectionstatechange = () => {
-      if (['failed','disconnected','closed'].includes(pc.connectionState)) {
-        delete peerConnections[viewerId];
-      }
+      if (['failed','disconnected','closed'].includes(pc.connectionState)) delete peerConnections[viewerId];
     };
     return pc;
   }
@@ -487,6 +732,9 @@
     Object.values(peerConnections).forEach(pc => pc.close());
     peerConnections = {};
     stopScreenShare();
+    if (webcamStream) { webcamStream.getTracks().forEach(t=>t.stop()); webcamStream = null; webcamOn = false; }
+    if (micStream)    { micStream.getTracks().forEach(t=>t.stop());    micStream = null; }
+    if (audioCtx)     { audioCtx.close(); audioCtx = null; }
     isLive = false;
     clearInterval(uptimeInterval);
     document.getElementById('statusBadge').classList.remove('live');
@@ -495,13 +743,13 @@
     document.getElementById('previewLabel').textContent = 'PREVIEW';
     document.getElementById('btnEndLive').style.display = 'none';
     document.getElementById('btnGoLive').style.display = 'flex';
+    document.getElementById('btnGoLive').disabled = true;
     document.getElementById('setupPanel').style.display = 'block';
     document.getElementById('roomCodeCard').style.display = 'none';
     document.getElementById('uptimePill').style.display = 'none';
-    viewers = {};
-    renderViewerList();
-    closeEndModal();
-    roomId = null;
+    document.getElementById('webcamOptions').style.display = 'none';
+    document.getElementById('micIndicator').className = 'mic-indicator';
+    viewers = {}; renderViewerList(); closeEndModal(); roomId = null;
   }
 
   // ── CHAT ──────────────────────────────────────────────────────────────────
@@ -512,11 +760,8 @@
     socket.emit('chat:message', { message: msg });
     input.value = '';
   }
-
-  function handleChatKey(e) { if (e.key === 'Enter') sendChat(); }
-
-  socket.on('chat:message', (msg) => appendChatMsg(msg));
-  socket.on('chat:pinned', ({ msgId }) => pinMessage(msgId));
+  function handleChatKey(e) { if (e.key==='Enter') sendChat(); }
+  socket.on('chat:message', appendChatMsg);
 
   let chatMessages = [];
   function appendChatMsg(msg) {
@@ -526,11 +771,10 @@
     el.className = 'chat-msg' + (msg.isHost ? ' host-msg' : '');
     el.dataset.id = msg.id;
     el.innerHTML = `
-      <div class="msg-author ${msg.isHost ? 'is-host' : ''}">${esc(msg.username)}</div>
+      <div class="msg-author ${msg.isHost?'is-host':''}">${esc(msg.username)}</div>
       <span class="msg-time">${formatTime(msg.timestamp)}</span>
       ${esc(msg.message)}
-      <div><button class="pin-msg-btn" onclick="pinMsgById(${msg.id}, '${esc(msg.message).replace(/'/g,'\\\'')}')" >📌 Fixar</button></div>
-    `;
+      <div><button class="pin-msg-btn" onclick="pinMsgById(${msg.id},'${esc(msg.message).replace(/'/g,"\\'")}')">📌 Fixar</button></div>`;
     box.appendChild(el);
     box.scrollTop = box.scrollHeight;
   }
@@ -538,7 +782,7 @@
   function addSystemMsg(text) {
     const box = document.getElementById('chatMessages');
     const el = document.createElement('div');
-    el.style.cssText = 'text-align:center;font-size:.75rem;color:var(--muted);padding:4px 0;';
+    el.style.cssText='text-align:center;font-size:.75rem;color:var(--muted);padding:4px 0;';
     el.textContent = text;
     box.appendChild(el);
     box.scrollTop = box.scrollHeight;
@@ -546,20 +790,16 @@
 
   function pinMsgById(id, text) {
     socket.emit('host:pin-message', { msgId: id });
-    showPinned(text);
-  }
-
-  socket.on('chat:pinned', ({ msgId }) => {
-    const msg = chatMessages.find(m => m.id === msgId);
-    if (msg) showPinned(msg.message);
-  });
-
-  function showPinned(text) {
     document.getElementById('pinnedMsg').style.display = 'block';
     document.getElementById('pinnedMsgText').textContent = text;
   }
 
-  // ── KICK ──────────────────────────────────────────────────────────────────
+  socket.on('host:kick', ({ viewerId }) => {
+    socket.emit('host:kick', { viewerId });
+    delete viewers[viewerId];
+    renderViewerList();
+  });
+
   function kickViewer(viewerId) {
     socket.emit('host:kick', { viewerId });
     delete viewers[viewerId];
@@ -569,14 +809,12 @@
   // ── UI HELPERS ────────────────────────────────────────────────────────────
   function copyRoomCode() {
     navigator.clipboard.writeText(roomId);
-    const btn = document.querySelector('.copy-btn');
+    const btn = document.querySelector('#roomCodeCard .btn-ghost');
     btn.textContent = 'Copiado!';
-    setTimeout(() => btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copiar`, 1500);
+    setTimeout(() => btn.textContent = 'Copiar', 1500);
   }
 
-  function updateViewerCount(n) {
-    document.getElementById('viewerCountTop').textContent = n;
-  }
+  function updateViewerCount(n) { document.getElementById('viewerCountTop').textContent = n; }
 
   function renderViewerList() {
     const list = document.getElementById('viewerList');
@@ -585,22 +823,20 @@
       list.innerHTML = '<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:16px;">Nenhum espectador ainda</div>';
       return;
     }
-    list.innerHTML = entries.map(([id, v]) => `
+    list.innerHTML = entries.map(([id,v]) => `
       <div class="viewer-item">
         <div class="vname">
           <div class="viewer-avatar">${v.username.charAt(0).toUpperCase()}</div>
           <span>${esc(v.username)}</span>
         </div>
         <button class="kick-btn" onclick="kickViewer('${id}')">Remover</button>
-      </div>
-    `).join('');
+      </div>`).join('');
   }
 
   function updateUptime() {
     const s = Math.floor((Date.now() - liveStartTime) / 1000);
-    const m = Math.floor(s / 60).toString().padStart(2,'0');
-    const ss = (s % 60).toString().padStart(2,'0');
-    document.getElementById('uptimeDisplay').textContent = `${m}:${ss}`;
+    document.getElementById('uptimeDisplay').textContent =
+      `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
   }
 
   function formatTime(ts) {

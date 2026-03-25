@@ -88,7 +88,7 @@ io.on('connection', (socket) => {
     console.log(`[viewer:join] ${name} → room ${roomId} (total: ${room.viewers.size})`);
   });
 
-  // ─── WEBRTC SIGNALING ──────────────────────────────────────────────────────
+  // ─── WEBRTC SIGNALING (host → viewer) ─────────────────────────────────────
 
   socket.on('webrtc:offer', ({ targetId, offer }) => {
     io.to(targetId).emit('webrtc:offer', { from: socket.id, offer });
@@ -100,6 +100,32 @@ io.on('connection', (socket) => {
 
   socket.on('webrtc:ice', ({ targetId, candidate }) => {
     io.to(targetId).emit('webrtc:ice', { from: socket.id, candidate });
+  });
+
+  // ─── WEBRTC UPSTREAM (viewer → host mic/camera) ────────────────────────────
+
+  socket.on('upstream:offer', ({ offer }) => {
+    const room = rooms.get(socket.roomId);
+    if (!room) return;
+    io.to(room.hostId).emit('upstream:offer', {
+      viewerId: socket.id,
+      username: socket.username,
+      offer
+    });
+  });
+
+  socket.on('upstream:answer', ({ viewerId, answer }) => {
+    io.to(viewerId).emit('upstream:answer', { answer });
+  });
+
+  socket.on('upstream:ice', ({ targetId, candidate }) => {
+    io.to(targetId).emit('upstream:ice', { from: socket.id, candidate });
+  });
+
+  socket.on('upstream:stop', () => {
+    const room = rooms.get(socket.roomId);
+    if (!room) return;
+    io.to(room.hostId).emit('upstream:stop', { viewerId: socket.id });
   });
 
   // ─── CHAT ──────────────────────────────────────────────────────────────────

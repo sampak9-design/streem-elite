@@ -212,6 +212,24 @@
     .modal p { color: var(--muted); font-size: 0.85rem; margin-bottom: 20px; }
     .modal-btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
 
+    .participant-tile {
+      position: relative; width: 120px; border-radius: 8px; overflow: hidden;
+      background: #000; border: 1px solid var(--border);
+    }
+    .participant-tile video { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; }
+    .participant-tile .ptile-name {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: rgba(0,0,0,.7); font-size: .68rem; padding: 3px 6px;
+      color: #fff; display: flex; align-items: center; gap: 4px;
+    }
+    .ptile-audio-only {
+      width: 120px; height: 70px; border-radius: 8px;
+      background: var(--card); border: 1px solid var(--border);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 4px; font-size: .72rem; color: var(--muted);
+    }
+    .ptile-audio-only svg { width: 20px; height: 20px; color: var(--green); }
+
     ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
   </style>
@@ -334,6 +352,12 @@
       <div id="viewerList">
         <div style="color:var(--muted);font-size:.82rem;text-align:center;padding:16px;">Nenhum espectador ainda</div>
       </div>
+    </div>
+
+    <!-- PARTICIPANTS (viewers with mic/camera on) -->
+    <div id="participantsCard" style="display:none; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px;">
+      <div style="font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Participantes com mic/câmera</div>
+      <div id="participantsList" style="display:flex;gap:10px;flex-wrap:wrap;"></div>
     </div>
 
   </div>
@@ -846,6 +870,86 @@
 
   function esc(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── UPSTREAM: VIEWERS WITH MIC/CAMERA ────────────────────────────────────
+  const upstreamPCs = {}; // viewerId -> RTCPeerConnection
+
+  socket.on('upstream:offer', async ({ viewerId, username, offer }) => {
+    if (upstreamPCs[viewerId]) { upstreamPCs[viewerId].close(); }
+
+    const upc = new RTCPeerConnection(ICE_CONFIG);
+    upstreamPCs[viewerId] = upc;
+
+    upc.ontrack = (e) => {
+      addParticipantTile(viewerId, username, e.streams[0], e.track.kind);
+    };
+
+    upc.onicecandidate = ({ candidate }) => {
+      if (candidate) socket.emit('upstream:ice', { targetId: viewerId, candidate });
+    };
+
+    await upc.setRemoteDescription(new RTCSessionDescription(offer));
+    const answer = await upc.createAnswer();
+    await upc.setLocalDescription(answer);
+    socket.emit('upstream:answer', { viewerId, answer });
+  });
+
+  socket.on('upstream:ice', async ({ from, candidate }) => {
+    const upc = upstreamPCs[from];
+    if (upc && candidate) await upc.addIceCandidate(new RTCIceCandidate(candidate));
+  });
+
+  socket.on('upstream:stop', ({ viewerId }) => {
+    if (upstreamPCs[viewerId]) { upstreamPCs[viewerId].close(); delete upstreamPCs[viewerId]; }
+    removeParticipantTile(viewerId);
+  });
+
+  const participantStreams = {}; // viewerId -> { stream, kind, username }
+
+  function addParticipantTile(viewerId, username, stream, kind) {
+    participantStreams[viewerId] = { stream, kind, username };
+    renderParticipants();
+  }
+
+  function removeParticipantTile(viewerId) {
+    delete participantStreams[viewerId];
+    renderParticipants();
+  }
+
+  function renderParticipants() {
+    const card = document.getElementById('participantsCard');
+    const list = document.getElementById('participantsList');
+    const entries = Object.entries(participantStreams);
+    if (!entries.length) { card.style.display = 'none'; return; }
+    card.style.display = 'block';
+    list.innerHTML = '';
+    entries.forEach(([id, { stream, kind, username: uname }]) => {
+      if (kind === 'video') {
+        const tile = document.createElement('div');
+        tile.className = 'participant-tile';
+        tile.id = 'ptile-' + id;
+        const v = document.createElement('video');
+        v.autoplay = true; v.muted = true; v.playsInline = true;
+        v.srcObject = stream;
+        tile.appendChild(v);
+        const label = document.createElement('div');
+        label.className = 'ptile-name';
+        label.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="10"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>${esc(uname)}`;
+        tile.appendChild(label);
+        list.appendChild(tile);
+      } else {
+        const tile = document.createElement('div');
+        tile.className = 'ptile-audio-only';
+        tile.id = 'ptile-' + id;
+        tile.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg><span>${esc(uname)}</span>`;
+        // Play audio
+        const a = document.createElement('audio');
+        a.srcObject = stream; a.autoplay = true;
+        document.body.appendChild(a);
+        list.appendChild(tile);
+      }
+    });
   }
 </script>
 </body>

@@ -143,21 +143,53 @@
       cursor: pointer; padding: 2px; line-height: 1;
     }
 
-    /* mobile chat toggle button (floating) */
-    #chatToggleBtn {
-      display: none; position: fixed; bottom: 20px; right: 16px;
-      background: var(--accent); border: none; border-radius: 50px;
-      color: #fff; padding: 10px 16px; font-size: 0.82rem; font-weight: 700;
-      cursor: pointer; z-index: 30; box-shadow: 0 4px 20px rgba(124,58,237,.5);
-      align-items: center; gap: 7px;
+    /* ── BOTTOM CONTROL BAR ── */
+    .bottom-bar {
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+      padding: 12px 16px; background: var(--surface); border-top: 1px solid var(--border);
+      flex-shrink: 0;
     }
-    #chatToggleBtn svg { width: 15px; height: 15px; }
-    #chatBadge {
-      background: var(--live); color: #fff; border-radius: 50%;
-      width: 18px; height: 18px; font-size: 0.65rem; font-weight: 800;
+    .ctrl-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .ctrl-btn {
+      position: relative; width: 52px; height: 52px; border-radius: 50%;
+      background: #2a2a3a; border: none; color: var(--text);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: background .2s; flex-shrink: 0;
+    }
+    .ctrl-btn svg { width: 22px; height: 22px; pointer-events: none; }
+    .ctrl-btn:hover { background: #3a3a4e; }
+    .ctrl-btn.off { background: var(--red); }
+    .ctrl-btn.off:hover { background: #c0392b; }
+    .ctrl-btn.active { background: rgba(124,58,237,.4); border: 2px solid var(--accent2); }
+    .ctrl-btn.leave { background: var(--red); width: 56px; height: 56px; }
+    .ctrl-btn.leave:hover { background: #c0392b; }
+    .ctrl-warn {
+      position: absolute; top: 0; right: 0;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: var(--yellow); color: #000;
+      font-size: 0.65rem; font-weight: 900;
+      display: flex; align-items: center; justify-content: center;
+      border: 2px solid var(--surface);
+    }
+    .ctrl-warn.hidden { display: none; }
+    .ctrl-label { font-size: 0.65rem; color: var(--muted); white-space: nowrap; }
+    .chat-badge-dot {
+      position: absolute; top: 2px; right: 2px;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: var(--live); color: #fff; font-size: 0.6rem; font-weight: 800;
       display: none; align-items: center; justify-content: center;
+      border: 2px solid var(--surface);
     }
-    #chatBadge.show { display: flex; }
+    .chat-badge-dot.show { display: flex; }
+
+    /* cam preview thumbnail (viewer's own camera) */
+    #selfPreview {
+      display: none; position: fixed; bottom: 90px; right: 12px;
+      width: 100px; height: 75px; border-radius: 10px; overflow: hidden;
+      border: 2px solid var(--accent2); box-shadow: 0 4px 16px rgba(0,0,0,.5); z-index: 25;
+    }
+    #selfPreview video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+    #selfPreview.show { display: block; }
     #pinnedMsg {
       display: none; padding: 8px 12px; background: rgba(124,58,237,.12);
       border-left: 3px solid var(--accent); margin: 0 10px 6px; border-radius: 0 6px 6px 0;
@@ -216,53 +248,37 @@
 
     /* ── MOBILE ── */
     @media (max-width: 640px) {
-      /* join card full width */
       .join-card { padding: 28px 20px; }
-
-      /* topbar compact */
       .topbar { padding: 8px 14px; gap: 8px; }
-      .stream-title { font-size: 0.82rem; max-width: 130px; }
-      .stat-pill span:last-child { display: none; } /* hide "online" label */
+      .stream-title { font-size: 0.82rem; max-width: 120px; }
+      .stat-pill span:last-child { display: none; }
       .stat-pill { padding: 3px 9px; }
 
-      /* content stacks vertically */
       .content { flex-direction: column; }
-
-      /* video: fixed aspect ratio, no flex stretch */
-      .video-area {
-        flex: none;
-        width: 100%;
-        aspect-ratio: 16/9;
-        max-height: 55vw;
-      }
+      .video-area { flex: none; width: 100%; aspect-ratio: 16/9; }
       #remoteVideo { height: 100%; }
 
-      /* chat: full width, fills remaining space */
+      /* chat slides up from above the bottom bar */
       .chat-panel {
-        width: 100%;
-        border-left: none;
-        border-top: 1px solid var(--border);
-        flex: 1;
-        /* mobile: hidden by default, shown as overlay */
-        position: fixed;
-        bottom: 0; left: 0; right: 0;
-        height: 60vh;
-        z-index: 20;
-        transform: translateY(100%);
-        transition: transform .3s ease;
-        border-radius: 16px 16px 0 0;
-        box-shadow: 0 -8px 40px rgba(0,0,0,.5);
+        width: 100%; border-left: none; border-top: 1px solid var(--border); flex: 1;
+        position: fixed; bottom: 76px; left: 0; right: 0; height: 55vh;
+        z-index: 20; transform: translateY(110%); transition: transform .3s ease;
+        border-radius: 16px 16px 0 0; box-shadow: 0 -8px 40px rgba(0,0,0,.5);
       }
       .chat-panel.open { transform: translateY(0); }
       .chat-close-btn { display: block; }
 
-      /* show floating chat toggle */
-      #chatToggleBtn { display: flex; }
+      .video-btns { bottom: 8px; right: 8px; gap: 5px; }
+      .video-btn { padding: 4px 7px; font-size: 0.68rem; }
+      .video-btn span { display: none; }
 
-      /* video btns smaller */
-      .video-btns { bottom: 8px; right: 8px; gap: 6px; }
-      .video-btn { padding: 5px 8px; font-size: 0.7rem; }
-      .video-btn span { display: none; } /* icon only on mobile */
+      /* bottom bar fills full width on mobile */
+      .bottom-bar { gap: 6px; padding: 10px 8px; justify-content: space-around; }
+      .ctrl-btn  { width: 48px; height: 48px; }
+      .ctrl-btn.leave { width: 52px; height: 52px; }
+      .ctrl-label { font-size: 0.6rem; }
+
+      #selfPreview { bottom: 86px; }
     }
   </style>
 </head>
@@ -356,16 +372,54 @@
       </div>
     </div>
   </div>
+
+  <!-- BOTTOM CONTROL BAR -->
+  <div class="bottom-bar">
+    <!-- MIC -->
+    <div class="ctrl-wrap">
+      <button class="ctrl-btn" id="ctrlMic" onclick="toggleViewerMic()">
+        <span class="ctrl-warn" id="micWarn">!</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+      </button>
+      <span class="ctrl-label">Microfone</span>
+    </div>
+    <!-- CAMERA -->
+    <div class="ctrl-wrap">
+      <button class="ctrl-btn" id="ctrlCam" onclick="toggleViewerCam()">
+        <span class="ctrl-warn" id="camWarn">!</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+      </button>
+      <span class="ctrl-label">Câmera</span>
+    </div>
+    <!-- CHAT -->
+    <div class="ctrl-wrap">
+      <button class="ctrl-btn" id="ctrlChat" onclick="toggleChat()">
+        <span class="chat-badge-dot" id="chatBadgeDot"></span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </button>
+      <span class="ctrl-label">Chat</span>
+    </div>
+    <!-- FULLSCREEN -->
+    <div class="ctrl-wrap">
+      <button class="ctrl-btn" onclick="toggleFullscreen()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+      </button>
+      <span class="ctrl-label">Tela cheia</span>
+    </div>
+    <!-- LEAVE -->
+    <div class="ctrl-wrap">
+      <button class="ctrl-btn leave" onclick="leaveStream()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.42 19.42 0 0 1 4.13 9.5 2 2 0 0 1 6.1 7.28h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L10.68 13.31z"/><line x1="23" y1="1" x2="1" y2="23"/></svg>
+      </button>
+      <span class="ctrl-label">Sair</span>
+    </div>
+  </div>
 </div>
 
 <div id="pipBanner">Live continua rodando em segundo plano ▶</div>
 
-<!-- Mobile chat toggle button -->
-<button id="chatToggleBtn" onclick="toggleChat()">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-  Chat
-  <span id="chatBadge" class="chatBadge"></span>
-</button>
+<!-- Self camera preview -->
+<div id="selfPreview"><video id="selfVideo" autoplay muted playsinline></video></div>
 
 <!-- STREAM ENDED -->
 <div id="endedOverlay">
@@ -380,10 +434,15 @@
   let username = null;
   let hostId = null;
   let pc = null;
-  let wakeLock = null;
-  let pipPrimed = false;
-  let chatOpen = false;
+  let wakeLock    = null;
+  let pipPrimed   = false;
+  let chatOpen    = false;
   let unreadCount = 0;
+  let viewerMicStream = null;
+  let viewerCamStream = null;
+  let upstreamPC      = null;
+  let micEnabled = false;
+  let camEnabled = false;
 
   const ICE_CONFIG = {
     iceServers: [
@@ -489,12 +548,11 @@
 
   socket.on('chat:message', (msg) => {
     appendMsg(msg);
-    // Badge for unread messages on mobile when chat is closed
-    if (!chatOpen && window.innerWidth <= 640) {
+    if (!chatOpen) {
       unreadCount++;
-      const badge = document.getElementById('chatBadge');
-      badge.textContent = unreadCount > 9 ? '9+' : unreadCount;
-      badge.style.cssText = 'display:flex;background:var(--live);color:#fff;border-radius:50%;width:18px;height:18px;font-size:.65rem;font-weight:800;align-items:center;justify-content:center;margin-left:2px;';
+      const dot = document.getElementById('chatBadgeDot');
+      dot.textContent = unreadCount > 9 ? '9+' : unreadCount;
+      dot.classList.add('show');
     }
   });
   socket.on('chat:pinned', ({ msgId }) => {
@@ -610,14 +668,107 @@
     } catch(e) { /* not supported or denied */ }
   }
 
-  // ── CHAT TOGGLE (mobile) ──────────────────────────────────────────────────
+  // ── VIEWER MIC ────────────────────────────────────────────────────────────
+  async function toggleViewerMic() {
+    if (!micEnabled) {
+      try {
+        viewerMicStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        micEnabled = true;
+        document.getElementById('ctrlMic').classList.remove('off');
+        document.getElementById('ctrlMic').classList.add('active');
+        document.getElementById('micWarn').classList.add('hidden');
+        await rebuildUpstream();
+      } catch(e) {
+        alert('Sem permissão para o microfone.');
+      }
+    } else {
+      micEnabled = false;
+      if (viewerMicStream) { viewerMicStream.getTracks().forEach(t=>t.stop()); viewerMicStream = null; }
+      document.getElementById('ctrlMic').classList.remove('active');
+      document.getElementById('ctrlMic').classList.add('off');
+      await rebuildUpstream();
+    }
+  }
+
+  // ── VIEWER CAMERA ─────────────────────────────────────────────────────────
+  async function toggleViewerCam() {
+    if (!camEnabled) {
+      try {
+        viewerCamStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        camEnabled = true;
+        document.getElementById('ctrlCam').classList.remove('off');
+        document.getElementById('ctrlCam').classList.add('active');
+        document.getElementById('camWarn').classList.add('hidden');
+        // Show self preview
+        document.getElementById('selfVideo').srcObject = viewerCamStream;
+        document.getElementById('selfPreview').classList.add('show');
+        await rebuildUpstream();
+      } catch(e) {
+        alert('Sem permissão para a câmera.');
+      }
+    } else {
+      camEnabled = false;
+      if (viewerCamStream) { viewerCamStream.getTracks().forEach(t=>t.stop()); viewerCamStream = null; }
+      document.getElementById('ctrlCam').classList.remove('active');
+      document.getElementById('ctrlCam').classList.add('off');
+      document.getElementById('selfPreview').classList.remove('show');
+      await rebuildUpstream();
+    }
+  }
+
+  // ── UPSTREAM WEBRTC (viewer → host) ───────────────────────────────────────
+  async function rebuildUpstream() {
+    if (upstreamPC) { upstreamPC.close(); upstreamPC = null; }
+
+    if (!micEnabled && !camEnabled) {
+      socket.emit('upstream:stop');
+      return;
+    }
+
+    upstreamPC = new RTCPeerConnection(ICE_CONFIG);
+
+    if (micEnabled && viewerMicStream) {
+      viewerMicStream.getAudioTracks().forEach(t => upstreamPC.addTrack(t, viewerMicStream));
+    }
+    if (camEnabled && viewerCamStream) {
+      viewerCamStream.getVideoTracks().forEach(t => upstreamPC.addTrack(t, viewerCamStream));
+    }
+
+    upstreamPC.onicecandidate = ({ candidate }) => {
+      if (candidate) socket.emit('upstream:ice', { targetId: hostId, candidate });
+    };
+
+    const offer = await upstreamPC.createOffer();
+    await upstreamPC.setLocalDescription(offer);
+    socket.emit('upstream:offer', { offer });
+  }
+
+  socket.on('upstream:answer', async ({ answer }) => {
+    if (upstreamPC) await upstreamPC.setRemoteDescription(new RTCSessionDescription(answer));
+  });
+
+  socket.on('upstream:ice', async ({ candidate }) => {
+    if (upstreamPC && candidate) await upstreamPC.addIceCandidate(new RTCIceCandidate(candidate));
+  });
+
+  // ── LEAVE ─────────────────────────────────────────────────────────────────
+  function leaveStream() {
+    if (pc) pc.close();
+    if (upstreamPC) upstreamPC.close();
+    if (viewerMicStream) viewerMicStream.getTracks().forEach(t=>t.stop());
+    if (viewerCamStream) viewerCamStream.getTracks().forEach(t=>t.stop());
+    socket.disconnect();
+    location.reload();
+  }
+
+  // ── CHAT TOGGLE ───────────────────────────────────────────────────────────
   function toggleChat() {
     chatOpen = !chatOpen;
     document.getElementById('chatPanel').classList.toggle('open', chatOpen);
+    document.getElementById('ctrlChat').classList.toggle('active', chatOpen);
     if (chatOpen) {
       unreadCount = 0;
-      document.getElementById('chatBadge').style.display = 'none';
-      // scroll to bottom
+      document.getElementById('chatBadgeDot').classList.remove('show');
       const box = document.getElementById('chatMessages');
       box.scrollTop = box.scrollHeight;
     }

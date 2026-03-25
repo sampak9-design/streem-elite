@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Streem Elite — Assistir</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    :root {
+      --bg:      #0a0a0f;
+      --surface: #12121a;
+      --card:    #1a1a2e;
+      --border:  #2a2a3e;
+      --accent:  #7c3aed;
+      --accent2: #a855f7;
+      --green:   #22c55e;
+      --red:     #ef4444;
+      --text:    #e2e8f0;
+      --muted:   #64748b;
+      --live:    #ff3b3b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* ── JOIN SCREEN ── */
+    #joinScreen {
+      display: flex; align-items: center; justify-content: center;
+      flex: 1; padding: 20px;
+    }
+    .join-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+      padding: 36px 32px; width: 380px; max-width: 100%;
+      display: flex; flex-direction: column; gap: 16px;
+    }
+    .join-logo { font-size: 1.4rem; font-weight: 800; color: var(--accent2); letter-spacing: 1px; margin-bottom: 6px; }
+    .join-title { font-size: 1rem; font-weight: 600; color: var(--text); }
+    .join-sub { font-size: 0.82rem; color: var(--muted); }
+    .form-group label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 5px; }
+    .form-group input {
+      width: 100%; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 14px; color: var(--text); font-size: 0.9rem; outline: none;
+      transition: border .2s; text-transform: uppercase; letter-spacing: 2px; font-weight: 700;
+    }
+    .form-group input.normal { text-transform: none; letter-spacing: 0; font-weight: 400; }
+    .form-group input:focus { border-color: var(--accent); }
+    .btn-join {
+      width: 100%; padding: 12px; background: var(--accent); border: none;
+      border-radius: 8px; color: #fff; font-size: 0.95rem; font-weight: 700;
+      cursor: pointer; transition: background .2s; margin-top: 4px;
+    }
+    .btn-join:hover { background: var(--accent2); }
+    .error-msg { color: var(--red); font-size: 0.82rem; display: none; }
+
+    /* ── MAIN VIEW ── */
+    #mainView { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+
+    /* ── TOP BAR ── */
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .stream-title { font-size: 0.95rem; font-weight: 700; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .live-badge {
+      display: flex; align-items: center; gap: 6px;
+      background: rgba(255,59,59,.15); border: 1px solid var(--live);
+      border-radius: 20px; padding: 4px 12px; font-size: 0.75rem; font-weight: 800; color: var(--live);
+    }
+    .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--live); animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+    .stat-pill {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 20px; padding: 4px 12px; font-size: 0.8rem;
+    }
+    .stat-pill svg { width: 14px; height: 14px; }
+    .stat-pill .val { font-weight: 700; color: var(--accent2); }
+
+    /* ── CONTENT ── */
+    .content { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── VIDEO ── */
+    .video-area {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      background: #000; position: relative;
+    }
+    #remoteVideo { width: 100%; height: 100%; object-fit: contain; display: block; }
+    #videoOverlay {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 10px;
+      color: var(--muted); font-size: 0.9rem;
+    }
+    #videoOverlay svg { width: 56px; height: 56px; opacity: .25; }
+
+    .fullscreen-btn {
+      position: absolute; bottom: 14px; right: 14px;
+      background: rgba(0,0,0,.6); border: 1px solid var(--border);
+      border-radius: 6px; padding: 6px 10px; color: var(--text);
+      cursor: pointer; font-size: 0.75rem; transition: all .2s;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .fullscreen-btn:hover { background: rgba(124,58,237,.4); border-color: var(--accent); }
+
+    /* ── CHAT ── */
+    .chat-panel {
+      width: 300px; display: flex; flex-direction: column;
+      background: var(--surface); border-left: 1px solid var(--border);
+    }
+    .chat-header {
+      padding: 14px 16px; border-bottom: 1px solid var(--border);
+      font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .5px; color: var(--muted);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .chat-header svg { width: 13px; height: 13px; }
+    #pinnedMsg {
+      display: none; padding: 8px 12px; background: rgba(124,58,237,.12);
+      border-left: 3px solid var(--accent); margin: 0 10px 6px; border-radius: 0 6px 6px 0;
+      font-size: 0.78rem;
+    }
+    #pinnedMsg .pl { font-size: 0.68rem; color: var(--accent2); font-weight: 700; margin-bottom: 2px; }
+    #chatMessages {
+      flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 7px;
+      scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+    }
+    .chat-msg {
+      background: var(--card); border-radius: 8px; padding: 7px 10px;
+      font-size: 0.82rem; line-height: 1.4; border: 1px solid var(--border);
+      animation: msgIn .2s ease;
+    }
+    .chat-msg.host-msg { border-color: rgba(124,58,237,.4); background: rgba(124,58,237,.08); }
+    .chat-msg.my-msg { border-color: rgba(34,197,94,.3); }
+    @keyframes msgIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
+    .msg-author { font-weight: 700; color: var(--accent2); font-size: 0.77rem; margin-bottom: 2px; }
+    .msg-author.is-host::after { content: ' HOST'; font-size: 0.63rem; background: var(--accent); color: #fff; border-radius: 3px; padding: 1px 4px; margin-left: 4px; vertical-align: middle; }
+    .msg-time { float: right; font-size: 0.68rem; color: var(--muted); margin-left: 4px; }
+
+    .chat-input-row {
+      padding: 10px; border-top: 1px solid var(--border);
+      display: flex; gap: 7px;
+    }
+    .chat-input-row input {
+      flex: 1; background: var(--card); border: 1px solid var(--border);
+      border-radius: 6px; padding: 7px 10px; color: var(--text); font-size: 0.82rem; outline: none;
+      transition: border .2s;
+    }
+    .chat-input-row input:focus { border-color: var(--accent); }
+    .send-btn {
+      padding: 7px 12px; background: var(--accent); border: none;
+      border-radius: 6px; color: #fff; cursor: pointer; transition: background .2s;
+    }
+    .send-btn:hover { background: var(--accent2); }
+
+    /* ── ENDED OVERLAY ── */
+    #endedOverlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,.85);
+      align-items: center; justify-content: center; z-index: 50;
+      flex-direction: column; gap: 12px;
+    }
+    #endedOverlay.show { display: flex; }
+    #endedOverlay h2 { font-size: 1.3rem; }
+    #endedOverlay p { color: var(--muted); }
+    .btn-rejoin {
+      margin-top: 10px; padding: 10px 24px;
+      background: var(--accent); border: none; border-radius: 8px;
+      color: #fff; font-size: 0.9rem; font-weight: 700; cursor: pointer;
+    }
+
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+  </style>
+</head>
+<body>
+
+<!-- JOIN SCREEN -->
+<div id="joinScreen">
+  <div class="join-card">
+    <div class="join-logo">⬡ STREEM ELITE</div>
+    <div class="join-title">Entrar na Live</div>
+    <div class="join-sub">Insira o código da sala e seu apelido para assistir.</div>
+    <div class="form-group">
+      <label>Código da Sala</label>
+      <input type="text" id="roomCodeInput" placeholder="EX: A1B2C3D4" maxlength="8"
+             oninput="this.value=this.value.toUpperCase()" onkeydown="joinKey(event)" />
+    </div>
+    <div class="form-group">
+      <label>Seu apelido</label>
+      <input type="text" id="usernameInput" class="normal" placeholder="Visitante..." maxlength="30" onkeydown="joinKey(event)" />
+    </div>
+    <div class="error-msg" id="errorMsg">Sala não encontrada. Verifique o código.</div>
+    <button class="btn-join" onclick="joinRoom()">Entrar na Live</button>
+  </div>
+</div>
+
+<!-- MAIN VIEW -->
+<div id="mainView">
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="stream-title" id="streamTitle">Live</div>
+    <div class="live-badge"><div class="live-dot"></div>AO VIVO</div>
+    <div class="stat-pill">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span class="val" id="viewerCount">—</span>
+      <span style="color:var(--muted)">online</span>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+    <!-- VIDEO -->
+    <div class="video-area">
+      <div id="videoOverlay">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+        </svg>
+        <span>Aguardando stream do host...</span>
+      </div>
+      <video id="remoteVideo" autoplay playsinline></video>
+      <button class="fullscreen-btn" onclick="toggleFullscreen()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+        Tela cheia
+      </button>
+    </div>
+
+    <!-- CHAT -->
+    <div class="chat-panel">
+      <div class="chat-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Chat ao Vivo
+      </div>
+      <div id="pinnedMsg"><div class="pl">📌 FIXADO</div><div id="pinnedText"></div></div>
+      <div id="chatMessages"></div>
+      <div class="chat-input-row">
+        <input type="text" id="chatInput" placeholder="Comentar..." maxlength="300" onkeydown="handleChatKey(event)" />
+        <button class="send-btn" onclick="sendChat()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STREAM ENDED -->
+<div id="endedOverlay">
+  <h2>Live Encerrada</h2>
+  <p id="endedMsg">O host encerrou a transmissão.</p>
+  <button class="btn-rejoin" onclick="location.reload()">Voltar ao Início</button>
+</div>
+
+<script>
+  const socket = io();
+  let roomId = null;
+  let username = null;
+  let hostId = null;
+  let pc = null;
+
+  const ICE_CONFIG = {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+  };
+
+  // Auto-fill room from URL
+  window.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(location.search);
+    const r = params.get('room');
+    if (r) document.getElementById('roomCodeInput').value = r.toUpperCase();
+  });
+
+  function joinKey(e) { if (e.key === 'Enter') joinRoom(); }
+
+  function joinRoom() {
+    const code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+    const uname = document.getElementById('usernameInput').value.trim();
+    if (!code) { showError('Insira o código da sala.'); return; }
+    roomId = code;
+    username = uname || null;
+    socket.emit('viewer:join', { roomId: code, username: uname || null });
+  }
+
+  socket.on('viewer:joined:ok', ({ title, viewerCount, recentChat, hostId: hid }) => {
+    hostId = hid;
+    document.getElementById('streamTitle').textContent = title;
+    document.getElementById('viewerCount').textContent = viewerCount;
+    document.getElementById('joinScreen').style.display = 'none';
+    document.getElementById('mainView').style.display = 'flex';
+
+    recentChat.forEach(msg => appendMsg(msg));
+
+    // Create peer connection ready to receive
+    createPC();
+  });
+
+  socket.on('error', ({ message }) => showError(message));
+
+  // ── WEBRTC ───────────────────────────────────────────────────────────────
+  function createPC() {
+    pc = new RTCPeerConnection(ICE_CONFIG);
+
+    pc.ontrack = (e) => {
+      const video = document.getElementById('remoteVideo');
+      if (video.srcObject !== e.streams[0]) {
+        video.srcObject = e.streams[0];
+        document.getElementById('videoOverlay').style.display = 'none';
+      }
+    };
+
+    pc.onicecandidate = ({ candidate }) => {
+      if (candidate) socket.emit('webrtc:ice', { targetId: hostId, candidate });
+    };
+
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'failed') {
+        document.getElementById('videoOverlay').style.display = 'flex';
+      }
+    };
+  }
+
+  socket.on('webrtc:offer', async ({ from, offer }) => {
+    hostId = from;
+    if (!pc) createPC();
+    await pc.setRemoteDescription(new RTCSessionDescription(offer));
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    socket.emit('webrtc:answer', { targetId: from, answer });
+  });
+
+  socket.on('webrtc:ice', async ({ from, candidate }) => {
+    if (pc && candidate) await pc.addIceCandidate(new RTCIceCandidate(candidate));
+  });
+
+  // ── VIEWER COUNT ─────────────────────────────────────────────────────────
+  socket.on('viewer:count', ({ count }) => {
+    document.getElementById('viewerCount').textContent = count;
+  });
+
+  // ── CHAT ─────────────────────────────────────────────────────────────────
+  function sendChat() {
+    const input = document.getElementById('chatInput');
+    const msg = input.value.trim();
+    if (!msg || !roomId) return;
+    socket.emit('chat:message', { message: msg });
+    input.value = '';
+  }
+
+  function handleChatKey(e) { if (e.key === 'Enter') sendChat(); }
+
+  socket.on('chat:message', (msg) => appendMsg(msg));
+  socket.on('chat:pinned', ({ msgId }) => {
+    // find in DOM
+    const el = document.querySelector(`[data-id="${msgId}"] .msg-text`);
+    if (el) { showPinned(el.textContent); }
+  });
+
+  function appendMsg(msg) {
+    const isMine = msg.username === username;
+    const box = document.getElementById('chatMessages');
+    const el = document.createElement('div');
+    el.className = 'chat-msg' + (msg.isHost ? ' host-msg' : '') + (isMine ? ' my-msg' : '');
+    el.dataset.id = msg.id;
+    el.innerHTML = `
+      <div class="msg-author ${msg.isHost ? 'is-host' : ''}">${esc(msg.username)}</div>
+      <span class="msg-time">${formatTime(msg.timestamp)}</span>
+      <span class="msg-text">${esc(msg.message)}</span>
+    `;
+    box.appendChild(el);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function showPinned(text) {
+    document.getElementById('pinnedMsg').style.display = 'block';
+    document.getElementById('pinnedText').textContent = text;
+  }
+
+  // ── STREAM ENDED ─────────────────────────────────────────────────────────
+  socket.on('stream:ended', ({ message }) => {
+    document.getElementById('endedMsg').textContent = message || 'A live foi encerrada.';
+    document.getElementById('endedOverlay').classList.add('show');
+  });
+
+  socket.on('kicked', ({ message }) => {
+    document.getElementById('endedMsg').textContent = message || 'Você foi removido.';
+    document.getElementById('endedOverlay').classList.add('show');
+    if (pc) pc.close();
+  });
+
+  // ── FULLSCREEN ────────────────────────────────────────────────────────────
+  function toggleFullscreen() {
+    const el = document.querySelector('.video-area');
+    if (!document.fullscreenElement) el.requestFullscreen();
+    else document.exitFullscreen();
+  }
+
+  // ── HELPERS ───────────────────────────────────────────────────────────────
+  function showError(msg) {
+    const el = document.getElementById('errorMsg');
+    el.textContent = msg;
+    el.style.display = 'block';
+    setTimeout(() => el.style.display = 'none', 4000);
+  }
+
+  function formatTime(ts) {
+    const d = new Date(ts);
+    return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
+</body>
+</html>

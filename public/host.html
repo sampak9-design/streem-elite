@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Streem Elite — Host</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    :root {
+      --bg:       #0a0a0f;
+      --surface:  #12121a;
+      --card:     #1a1a2e;
+      --border:   #2a2a3e;
+      --accent:   #7c3aed;
+      --accent2:  #a855f7;
+      --green:    #22c55e;
+      --red:      #ef4444;
+      --yellow:   #eab308;
+      --text:     #e2e8f0;
+      --muted:    #64748b;
+      --live:     #ff3b3b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* ── TOP BAR ── */
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .topbar .logo { font-size: 1.1rem; font-weight: 700; color: var(--accent2); letter-spacing: 1px; }
+    .status-badge {
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 700;
+      background: var(--card); border: 1px solid var(--border); color: var(--muted);
+      transition: all .3s;
+    }
+    .status-badge.live { background: rgba(255,59,59,.15); border-color: var(--live); color: var(--live); }
+    .status-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+    .status-badge.live .dot { background: var(--live); animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    .topbar-right { display: flex; align-items: center; gap: 12px; }
+    .stat-pill {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 20px; padding: 4px 12px; font-size: 0.8rem;
+    }
+    .stat-pill svg { width: 14px; height: 14px; }
+    .stat-pill .val { font-weight: 700; color: var(--accent2); }
+
+    /* ── MAIN LAYOUT ── */
+    .main { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── LEFT: PREVIEW + CONTROLS ── */
+    .left-panel {
+      flex: 1; display: flex; flex-direction: column; gap: 12px;
+      padding: 16px; overflow-y: auto;
+    }
+
+    .preview-wrapper {
+      position: relative; background: #000; border-radius: 12px;
+      border: 1px solid var(--border); overflow: hidden;
+      aspect-ratio: 16/9; width: 100%; max-height: 420px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #localVideo {
+      width: 100%; height: 100%; object-fit: contain; display: block;
+    }
+    .preview-overlay {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 8px;
+      color: var(--muted); font-size: 0.9rem;
+    }
+    .preview-overlay svg { width: 48px; height: 48px; opacity: .3; }
+    .preview-label {
+      position: absolute; top: 10px; left: 10px;
+      background: rgba(0,0,0,.7); border-radius: 6px; padding: 3px 10px;
+      font-size: 0.72rem; font-weight: 700; color: var(--muted);
+    }
+    .preview-label.live { color: var(--live); }
+
+    /* ── CONTROLS ── */
+    .controls-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn {
+      display: flex; align-items: center; gap: 7px;
+      padding: 9px 18px; border-radius: 8px; font-size: 0.85rem; font-weight: 600;
+      border: 1px solid transparent; cursor: pointer; transition: all .2s;
+    }
+    .btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent2); }
+    .btn-danger  { background: var(--red); color: #fff; }
+    .btn-danger:hover  { opacity: .85; }
+    .btn-ghost   { background: var(--card); border-color: var(--border); color: var(--text); }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent2); }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* ── SETUP PANEL (before going live) ── */
+    #setupPanel {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px;
+    }
+    #setupPanel h3 { font-size: 0.9rem; color: var(--muted); margin-bottom: 14px; text-transform: uppercase; letter-spacing: .5px; }
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 5px; }
+    .form-group input {
+      width: 100%; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 6px; padding: 8px 12px; color: var(--text); font-size: 0.9rem;
+      outline: none; transition: border .2s;
+    }
+    .form-group input:focus { border-color: var(--accent); }
+
+    /* ── ROOM CODE ── */
+    #roomCodeCard {
+      display: none; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px;
+    }
+    .room-code-row { display: flex; align-items: center; gap: 10px; }
+    .room-code {
+      flex: 1; background: var(--surface); border: 1px dashed var(--accent);
+      border-radius: 8px; padding: 10px 14px; font-size: 1.4rem; font-weight: 800;
+      color: var(--accent2); letter-spacing: 4px; text-align: center;
+    }
+    .copy-btn { padding: 8px 14px; font-size: 0.8rem; }
+
+    /* ── VIEWER LIST ── */
+    #viewerListCard {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px;
+    }
+    #viewerListCard h3 { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 12px; }
+    #viewerList { display: flex; flex-direction: column; gap: 6px; max-height: 150px; overflow-y: auto; }
+    .viewer-item {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--surface); border-radius: 6px; padding: 7px 10px; font-size: 0.82rem;
+    }
+    .viewer-item .vname { display: flex; align-items: center; gap: 8px; }
+    .viewer-avatar {
+      width: 26px; height: 26px; border-radius: 50%;
+      background: var(--accent); display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem; font-weight: 700; color: #fff; flex-shrink: 0;
+    }
+    .kick-btn {
+      padding: 3px 8px; font-size: 0.72rem; border-radius: 4px;
+      background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3);
+      color: var(--red); cursor: pointer; transition: all .2s;
+    }
+    .kick-btn:hover { background: var(--red); color: #fff; }
+
+    /* ── RIGHT: CHAT ── */
+    .right-panel {
+      width: 320px; display: flex; flex-direction: column;
+      background: var(--surface); border-left: 1px solid var(--border);
+    }
+    .chat-header {
+      padding: 14px 16px; border-bottom: 1px solid var(--border);
+      font-size: 0.8rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .5px; color: var(--muted);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .chat-header svg { width: 14px; height: 14px; }
+    #chatMessages {
+      flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px;
+      scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+    }
+    .chat-msg {
+      background: var(--card); border-radius: 8px; padding: 8px 10px;
+      font-size: 0.83rem; line-height: 1.4; border: 1px solid var(--border);
+      animation: msgIn .2s ease;
+    }
+    .chat-msg.host-msg { border-color: rgba(124,58,237,.4); background: rgba(124,58,237,.08); }
+    @keyframes msgIn { from { opacity:0; transform: translateY(4px); } to { opacity:1; transform: none; } }
+    .msg-author { font-weight: 700; color: var(--accent2); font-size: 0.78rem; margin-bottom: 2px; }
+    .msg-author.is-host::after { content: ' HOST'; font-size: 0.65rem; background: var(--accent); color: #fff; border-radius: 3px; padding: 1px 4px; margin-left: 4px; vertical-align: middle; }
+    .msg-time { float: right; font-size: 0.7rem; color: var(--muted); margin-left: 6px; }
+    .pin-msg-btn {
+      display: none; font-size: 0.7rem; padding: 2px 6px;
+      background: rgba(124,58,237,.2); border: 1px solid rgba(124,58,237,.3);
+      color: var(--accent2); border-radius: 4px; cursor: pointer; margin-top: 4px;
+    }
+    .chat-msg:hover .pin-msg-btn { display: inline-block; }
+
+    #pinnedMsg {
+      display: none; padding: 8px 12px; background: rgba(124,58,237,.12);
+      border-left: 3px solid var(--accent); margin: 0 12px 8px; border-radius: 0 6px 6px 0;
+      font-size: 0.8rem;
+    }
+    #pinnedMsg .pinned-label { font-size: 0.7rem; color: var(--accent2); font-weight: 700; margin-bottom: 3px; }
+
+    .chat-input-row {
+      padding: 12px; border-top: 1px solid var(--border);
+      display: flex; gap: 8px;
+    }
+    .chat-input-row input {
+      flex: 1; background: var(--card); border: 1px solid var(--border);
+      border-radius: 6px; padding: 8px 12px; color: var(--text); font-size: 0.85rem; outline: none;
+      transition: border .2s;
+    }
+    .chat-input-row input:focus { border-color: var(--accent); }
+    .send-btn {
+      padding: 8px 14px; background: var(--accent); border: none;
+      border-radius: 6px; color: #fff; cursor: pointer; transition: background .2s;
+    }
+    .send-btn:hover { background: var(--accent2); }
+
+    /* ── MODAL ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7);
+      align-items: center; justify-content: center; z-index: 100;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+      padding: 28px; width: 420px; max-width: 95vw;
+    }
+    .modal h2 { font-size: 1.1rem; margin-bottom: 6px; }
+    .modal p { color: var(--muted); font-size: 0.85rem; margin-bottom: 20px; }
+    .modal-btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+    /* ── SCROLLBAR ── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+  </style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="logo">⬡ STREEM ELITE</div>
+  <div id="statusBadge" class="status-badge">
+    <span class="dot"></span><span id="statusText">Offline</span>
+  </div>
+  <div class="topbar-right">
+    <div class="stat-pill">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span class="val" id="viewerCountTop">0</span>
+      <span style="color:var(--muted)">espectadores</span>
+    </div>
+    <div class="stat-pill" id="uptimePill" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <span class="val" id="uptimeDisplay">00:00</span>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <!-- LEFT -->
+  <div class="left-panel">
+
+    <!-- PREVIEW -->
+    <div class="preview-wrapper">
+      <div id="previewOverlay" class="preview-overlay">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+        </svg>
+        <span>Nenhuma tela compartilhada</span>
+      </div>
+      <video id="localVideo" autoplay muted playsinline></video>
+      <div id="previewLabel" class="preview-label">PREVIEW</div>
+    </div>
+
+    <!-- CONTROLS -->
+    <div class="controls-row">
+      <button id="btnShare" class="btn btn-ghost" onclick="startScreenShare()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        Compartilhar Tela
+      </button>
+      <button id="btnGoLive" class="btn btn-primary" onclick="goLive()" disabled>
+        <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
+        Ir ao Vivo
+      </button>
+      <button id="btnEndLive" class="btn btn-danger" onclick="showEndModal()" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+        Encerrar Live
+      </button>
+    </div>
+
+    <!-- SETUP PANEL -->
+    <div id="setupPanel">
+      <h3>Configurar Live</h3>
+      <div class="form-group">
+        <label>Título da Live</label>
+        <input type="text" id="streamTitle" placeholder="Ex: Gameplay ao vivo, Tutorial..." value="Minha Live" />
+      </div>
+    </div>
+
+    <!-- ROOM CODE -->
+    <div id="roomCodeCard">
+      <div style="font-size:.8rem;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;">Código da Sala — Compartilhe com os Espectadores</div>
+      <div class="room-code-row">
+        <div class="room-code" id="roomCodeDisplay">—</div>
+        <button class="btn btn-ghost copy-btn" onclick="copyRoomCode()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          Copiar
+        </button>
+      </div>
+      <div style="font-size:.75rem;color:var(--muted);margin-top:8px;">
+        Link direto: <span id="viewerLink" style="color:var(--accent2)"></span>
+      </div>
+    </div>
+
+    <!-- VIEWER LIST -->
+    <div id="viewerListCard">
+      <h3>Espectadores Online</h3>
+      <div id="viewerList">
+        <div style="color:var(--muted);font-size:.82rem;text-align:center;padding:16px;">Nenhum espectador ainda</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT: CHAT -->
+  <div class="right-panel">
+    <div class="chat-header">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Chat ao Vivo
+    </div>
+    <div id="pinnedMsg">
+      <div class="pinned-label">📌 FIXADO</div>
+      <div id="pinnedMsgText"></div>
+    </div>
+    <div id="chatMessages"></div>
+    <div class="chat-input-row">
+      <input type="text" id="hostChatInput" placeholder="Mensagem como host..." onkeydown="handleChatKey(event)" />
+      <button class="send-btn" onclick="sendChat()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- END MODAL -->
+<div class="modal-overlay" id="endModal">
+  <div class="modal">
+    <h2>Encerrar a Live?</h2>
+    <p>Todos os espectadores serão desconectados e a sala será fechada.</p>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" onclick="closeEndModal()">Cancelar</button>
+      <button class="btn btn-danger" onclick="endLive()">Encerrar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const socket = io();
+  let roomId = null;
+  let isLive = false;
+  let localStream = null;
+  let peerConnections = {}; // viewerId -> RTCPeerConnection
+  let viewers = {}; // viewerId -> { username }
+  let uptimeInterval = null;
+  let liveStartTime = null;
+
+  const ICE_CONFIG = {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+  };
+
+  // ── SCREEN SHARE ──────────────────────────────────────────────────────────
+  async function startScreenShare() {
+    try {
+      localStream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: 30, cursor: 'always' },
+        audio: true
+      });
+      const video = document.getElementById('localVideo');
+      video.srcObject = localStream;
+      document.getElementById('previewOverlay').style.display = 'none';
+      document.getElementById('btnGoLive').disabled = false;
+      document.getElementById('btnShare').innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        Tela Capturada ✓`;
+
+      localStream.getVideoTracks()[0].onended = () => stopScreenShare();
+    } catch (e) {
+      console.error(e);
+      alert('Permissão negada ou erro ao capturar tela.');
+    }
+  }
+
+  function stopScreenShare() {
+    if (localStream) {
+      localStream.getTracks().forEach(t => t.stop());
+      localStream = null;
+    }
+    document.getElementById('localVideo').srcObject = null;
+    document.getElementById('previewOverlay').style.display = 'flex';
+    document.getElementById('btnGoLive').disabled = true;
+    document.getElementById('btnShare').innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      Compartilhar Tela`;
+  }
+
+  // ── GO LIVE ────────────────────────────────────────────────────────────────
+  function goLive() {
+    const title = document.getElementById('streamTitle').value.trim() || 'Live Stream';
+    socket.emit('host:create', { title });
+  }
+
+  socket.on('host:created', ({ roomId: id, title }) => {
+    roomId = id;
+    isLive = true;
+
+    document.getElementById('roomCodeDisplay').textContent = id;
+    const link = `${location.origin}/viewer.html?room=${id}`;
+    document.getElementById('viewerLink').textContent = link;
+    document.getElementById('roomCodeCard').style.display = 'block';
+    document.getElementById('setupPanel').style.display = 'none';
+    document.getElementById('btnGoLive').style.display = 'none';
+    document.getElementById('btnEndLive').style.display = 'flex';
+
+    const badge = document.getElementById('statusBadge');
+    badge.classList.add('live');
+    document.getElementById('statusText').textContent = 'AO VIVO';
+    document.getElementById('previewLabel').className = 'preview-label live';
+    document.getElementById('previewLabel').textContent = '● LIVE';
+
+    liveStartTime = Date.now();
+    document.getElementById('uptimePill').style.display = 'flex';
+    uptimeInterval = setInterval(updateUptime, 1000);
+  });
+
+  // ── NEW VIEWER → create offer ──────────────────────────────────────────────
+  socket.on('viewer:new', async ({ viewerId, username, viewerCount }) => {
+    viewers[viewerId] = { username };
+    updateViewerCount(viewerCount);
+    renderViewerList();
+    addSystemMsg(`${username} entrou na live`);
+
+    if (!localStream) return;
+    const pc = createPeerConnection(viewerId);
+    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    socket.emit('webrtc:offer', { targetId: viewerId, offer });
+  });
+
+  socket.on('webrtc:answer', async ({ from, answer }) => {
+    const pc = peerConnections[from];
+    if (pc) await pc.setRemoteDescription(new RTCSessionDescription(answer));
+  });
+
+  socket.on('webrtc:ice', async ({ from, candidate }) => {
+    const pc = peerConnections[from];
+    if (pc && candidate) await pc.addIceCandidate(new RTCIceCandidate(candidate));
+  });
+
+  socket.on('viewer:left', ({ viewerId, username, viewerCount }) => {
+    delete viewers[viewerId];
+    if (peerConnections[viewerId]) {
+      peerConnections[viewerId].close();
+      delete peerConnections[viewerId];
+    }
+    updateViewerCount(viewerCount);
+    renderViewerList();
+    addSystemMsg(`${username} saiu da live`);
+  });
+
+  socket.on('viewer:count', ({ count }) => updateViewerCount(count));
+
+  function createPeerConnection(viewerId) {
+    const pc = new RTCPeerConnection(ICE_CONFIG);
+    peerConnections[viewerId] = pc;
+
+    pc.onicecandidate = ({ candidate }) => {
+      if (candidate) socket.emit('webrtc:ice', { targetId: viewerId, candidate });
+    };
+
+    pc.onconnectionstatechange = () => {
+      if (['failed','disconnected','closed'].includes(pc.connectionState)) {
+        delete peerConnections[viewerId];
+      }
+    };
+    return pc;
+  }
+
+  // ── END LIVE ──────────────────────────────────────────────────────────────
+  function showEndModal() { document.getElementById('endModal').classList.add('open'); }
+  function closeEndModal() { document.getElementById('endModal').classList.remove('open'); }
+
+  function endLive() {
+    socket.emit('host:end');
+    Object.values(peerConnections).forEach(pc => pc.close());
+    peerConnections = {};
+    stopScreenShare();
+    isLive = false;
+    clearInterval(uptimeInterval);
+    document.getElementById('statusBadge').classList.remove('live');
+    document.getElementById('statusText').textContent = 'Offline';
+    document.getElementById('previewLabel').className = 'preview-label';
+    document.getElementById('previewLabel').textContent = 'PREVIEW';
+    document.getElementById('btnEndLive').style.display = 'none';
+    document.getElementById('btnGoLive').style.display = 'flex';
+    document.getElementById('setupPanel').style.display = 'block';
+    document.getElementById('roomCodeCard').style.display = 'none';
+    document.getElementById('uptimePill').style.display = 'none';
+    viewers = {};
+    renderViewerList();
+    closeEndModal();
+    roomId = null;
+  }
+
+  // ── CHAT ──────────────────────────────────────────────────────────────────
+  function sendChat() {
+    const input = document.getElementById('hostChatInput');
+    const msg = input.value.trim();
+    if (!msg || !roomId) return;
+    socket.emit('chat:message', { message: msg });
+    input.value = '';
+  }
+
+  function handleChatKey(e) { if (e.key === 'Enter') sendChat(); }
+
+  socket.on('chat:message', (msg) => appendChatMsg(msg));
+  socket.on('chat:pinned', ({ msgId }) => pinMessage(msgId));
+
+  let chatMessages = [];
+  function appendChatMsg(msg) {
+    chatMessages.push(msg);
+    const box = document.getElementById('chatMessages');
+    const el = document.createElement('div');
+    el.className = 'chat-msg' + (msg.isHost ? ' host-msg' : '');
+    el.dataset.id = msg.id;
+    el.innerHTML = `
+      <div class="msg-author ${msg.isHost ? 'is-host' : ''}">${esc(msg.username)}</div>
+      <span class="msg-time">${formatTime(msg.timestamp)}</span>
+      ${esc(msg.message)}
+      <div><button class="pin-msg-btn" onclick="pinMsgById(${msg.id}, '${esc(msg.message).replace(/'/g,'\\\'')}')" >📌 Fixar</button></div>
+    `;
+    box.appendChild(el);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function addSystemMsg(text) {
+    const box = document.getElementById('chatMessages');
+    const el = document.createElement('div');
+    el.style.cssText = 'text-align:center;font-size:.75rem;color:var(--muted);padding:4px 0;';
+    el.textContent = text;
+    box.appendChild(el);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function pinMsgById(id, text) {
+    socket.emit('host:pin-message', { msgId: id });
+    showPinned(text);
+  }
+
+  socket.on('chat:pinned', ({ msgId }) => {
+    const msg = chatMessages.find(m => m.id === msgId);
+    if (msg) showPinned(msg.message);
+  });
+
+  function showPinned(text) {
+    document.getElementById('pinnedMsg').style.display = 'block';
+    document.getElementById('pinnedMsgText').textContent = text;
+  }
+
+  // ── KICK ──────────────────────────────────────────────────────────────────
+  function kickViewer(viewerId) {
+    socket.emit('host:kick', { viewerId });
+    delete viewers[viewerId];
+    renderViewerList();
+  }
+
+  // ── UI HELPERS ────────────────────────────────────────────────────────────
+  function copyRoomCode() {
+    navigator.clipboard.writeText(roomId);
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = 'Copiado!';
+    setTimeout(() => btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copiar`, 1500);
+  }
+
+  function updateViewerCount(n) {
+    document.getElementById('viewerCountTop').textContent = n;
+  }
+
+  function renderViewerList() {
+    const list = document.getElementById('viewerList');
+    const entries = Object.entries(viewers);
+    if (!entries.length) {
+      list.innerHTML = '<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:16px;">Nenhum espectador ainda</div>';
+      return;
+    }
+    list.innerHTML = entries.map(([id, v]) => `
+      <div class="viewer-item">
+        <div class="vname">
+          <div class="viewer-avatar">${v.username.charAt(0).toUpperCase()}</div>
+          <span>${esc(v.username)}</span>
+        </div>
+        <button class="kick-btn" onclick="kickViewer('${id}')">Remover</button>
+      </div>
+    `).join('');
+  }
+
+  function updateUptime() {
+    const s = Math.floor((Date.now() - liveStartTime) / 1000);
+    const m = Math.floor(s / 60).toString().padStart(2,'0');
+    const ss = (s % 60).toString().padStart(2,'0');
+    document.getElementById('uptimeDisplay').textContent = `${m}:${ss}`;
+  }
+
+  function formatTime(ts) {
+    const d = new Date(ts);
+    return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
+</body>
+</html>

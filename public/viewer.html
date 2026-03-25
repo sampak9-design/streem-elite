@@ -134,9 +134,30 @@
       padding: 14px 16px; border-bottom: 1px solid var(--border);
       font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
       letter-spacing: .5px; color: var(--muted);
-      display: flex; align-items: center; gap: 8px;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
     }
+    .chat-header-left { display: flex; align-items: center; gap: 8px; }
     .chat-header svg { width: 13px; height: 13px; }
+    .chat-close-btn {
+      display: none; background: none; border: none; color: var(--muted);
+      cursor: pointer; padding: 2px; line-height: 1;
+    }
+
+    /* mobile chat toggle button (floating) */
+    #chatToggleBtn {
+      display: none; position: fixed; bottom: 20px; right: 16px;
+      background: var(--accent); border: none; border-radius: 50px;
+      color: #fff; padding: 10px 16px; font-size: 0.82rem; font-weight: 700;
+      cursor: pointer; z-index: 30; box-shadow: 0 4px 20px rgba(124,58,237,.5);
+      align-items: center; gap: 7px;
+    }
+    #chatToggleBtn svg { width: 15px; height: 15px; }
+    #chatBadge {
+      background: var(--live); color: #fff; border-radius: 50%;
+      width: 18px; height: 18px; font-size: 0.65rem; font-weight: 800;
+      display: none; align-items: center; justify-content: center;
+    }
+    #chatBadge.show { display: flex; }
     #pinnedMsg {
       display: none; padding: 8px 12px; background: rgba(124,58,237,.12);
       border-left: 3px solid var(--accent); margin: 0 10px 6px; border-radius: 0 6px 6px 0;
@@ -192,6 +213,57 @@
 
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+
+    /* ── MOBILE ── */
+    @media (max-width: 640px) {
+      /* join card full width */
+      .join-card { padding: 28px 20px; }
+
+      /* topbar compact */
+      .topbar { padding: 8px 14px; gap: 8px; }
+      .stream-title { font-size: 0.82rem; max-width: 130px; }
+      .stat-pill span:last-child { display: none; } /* hide "online" label */
+      .stat-pill { padding: 3px 9px; }
+
+      /* content stacks vertically */
+      .content { flex-direction: column; }
+
+      /* video: fixed aspect ratio, no flex stretch */
+      .video-area {
+        flex: none;
+        width: 100%;
+        aspect-ratio: 16/9;
+        max-height: 55vw;
+      }
+      #remoteVideo { height: 100%; }
+
+      /* chat: full width, fills remaining space */
+      .chat-panel {
+        width: 100%;
+        border-left: none;
+        border-top: 1px solid var(--border);
+        flex: 1;
+        /* mobile: hidden by default, shown as overlay */
+        position: fixed;
+        bottom: 0; left: 0; right: 0;
+        height: 60vh;
+        z-index: 20;
+        transform: translateY(100%);
+        transition: transform .3s ease;
+        border-radius: 16px 16px 0 0;
+        box-shadow: 0 -8px 40px rgba(0,0,0,.5);
+      }
+      .chat-panel.open { transform: translateY(0); }
+      .chat-close-btn { display: block; }
+
+      /* show floating chat toggle */
+      #chatToggleBtn { display: flex; }
+
+      /* video btns smaller */
+      .video-btns { bottom: 8px; right: 8px; gap: 6px; }
+      .video-btn { padding: 5px 8px; font-size: 0.7rem; }
+      .video-btn span { display: none; } /* icon only on mobile */
+    }
   </style>
 </head>
 <body>
@@ -264,10 +336,15 @@
     </div>
 
     <!-- CHAT -->
-    <div class="chat-panel">
+    <div class="chat-panel" id="chatPanel">
       <div class="chat-header">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        Chat ao Vivo
+        <div class="chat-header-left">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Chat ao Vivo
+        </div>
+        <button class="chat-close-btn" onclick="toggleChat()" title="Fechar chat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
       <div id="pinnedMsg"><div class="pl">📌 FIXADO</div><div id="pinnedText"></div></div>
       <div id="chatMessages"></div>
@@ -282,6 +359,13 @@
 </div>
 
 <div id="pipBanner">Live continua rodando em segundo plano ▶</div>
+
+<!-- Mobile chat toggle button -->
+<button id="chatToggleBtn" onclick="toggleChat()">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+  Chat
+  <span id="chatBadge" class="chatBadge"></span>
+</button>
 
 <!-- STREAM ENDED -->
 <div id="endedOverlay">
@@ -298,6 +382,8 @@
   let pc = null;
   let wakeLock = null;
   let pipPrimed = false;
+  let chatOpen = false;
+  let unreadCount = 0;
 
   const ICE_CONFIG = {
     iceServers: [
@@ -401,7 +487,16 @@
 
   function handleChatKey(e) { if (e.key === 'Enter') sendChat(); }
 
-  socket.on('chat:message', (msg) => appendMsg(msg));
+  socket.on('chat:message', (msg) => {
+    appendMsg(msg);
+    // Badge for unread messages on mobile when chat is closed
+    if (!chatOpen && window.innerWidth <= 640) {
+      unreadCount++;
+      const badge = document.getElementById('chatBadge');
+      badge.textContent = unreadCount > 9 ? '9+' : unreadCount;
+      badge.style.cssText = 'display:flex;background:var(--live);color:#fff;border-radius:50%;width:18px;height:18px;font-size:.65rem;font-weight:800;align-items:center;justify-content:center;margin-left:2px;';
+    }
+  });
   socket.on('chat:pinned', ({ msgId }) => {
     // find in DOM
     const el = document.querySelector(`[data-id="${msgId}"] .msg-text`);
@@ -514,6 +609,30 @@
       });
     } catch(e) { /* not supported or denied */ }
   }
+
+  // ── CHAT TOGGLE (mobile) ──────────────────────────────────────────────────
+  function toggleChat() {
+    chatOpen = !chatOpen;
+    document.getElementById('chatPanel').classList.toggle('open', chatOpen);
+    if (chatOpen) {
+      unreadCount = 0;
+      document.getElementById('chatBadge').style.display = 'none';
+      // scroll to bottom
+      const box = document.getElementById('chatMessages');
+      box.scrollTop = box.scrollHeight;
+    }
+  }
+
+  // Close chat when tapping outside on mobile
+  document.addEventListener('click', (e) => {
+    if (window.innerWidth > 640) return;
+    const panel = document.getElementById('chatPanel');
+    const btn   = document.getElementById('chatToggleBtn');
+    if (chatOpen && !panel.contains(e.target) && !btn.contains(e.target)) {
+      chatOpen = false;
+      panel.classList.remove('open');
+    }
+  });
 
   // ── FULLSCREEN ────────────────────────────────────────────────────────────
   function toggleFullscreen() {

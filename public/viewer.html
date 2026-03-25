@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Streem Elite — Assistir</title>
   <script src="/socket.io/socket.io.js"></script>
   <style>
@@ -20,7 +20,15 @@
       --live:    #ff3b3b;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+    body {
+      background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif;
+      height: 100vh; height: 100dvh;
+      display: flex; flex-direction: column; overflow: hidden;
+      /* safe area padding for notch/home indicator */
+      padding-top: env(safe-area-inset-top);
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+    }
 
     /* ── JOIN SCREEN ── */
     #joinScreen {
@@ -146,9 +154,10 @@
     /* ── BOTTOM CONTROL BAR ── */
     .bottom-bar {
       display: flex; align-items: center; justify-content: center; gap: 12px;
-      padding: 12px 16px; background: var(--surface); border-top: 1px solid var(--border);
+      padding: 12px 16px;
+      padding-bottom: max(12px, env(safe-area-inset-bottom));
+      background: var(--surface); border-top: 1px solid var(--border);
       flex-shrink: 0;
-      /* always on top of chat */
       position: relative; z-index: 40;
     }
     .ctrl-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
@@ -263,8 +272,12 @@
       /* chat slides up — stops exactly above the bottom bar */
       .chat-panel {
         width: 100%; border-left: none; border-top: 1px solid var(--border); flex: 1;
-        position: fixed; bottom: 72px; left: 0; right: 0; height: 55vh;
-        z-index: 20; transform: translateY(calc(100% + 72px)); transition: transform .3s ease;
+        position: fixed;
+        bottom: calc(72px + env(safe-area-inset-bottom));
+        left: 0; right: 0; height: 55vh;
+        z-index: 20;
+        transform: translateY(calc(100% + 72px + env(safe-area-inset-bottom)));
+        transition: transform .3s ease;
         border-radius: 16px 16px 0 0; box-shadow: 0 -8px 40px rgba(0,0,0,.5);
       }
       .chat-panel.open { transform: translateY(0); }

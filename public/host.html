@@ -477,6 +477,36 @@
 
     ::-webkit-scrollbar { width: 4px; height: 4px; }
     ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.07); border-radius: 4px; }
+
+    /* ── MOBILE ────────────────────────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      body {
+        grid-template-columns: 1fr;
+        grid-template-rows: 50px auto 1fr auto 60px;
+        grid-template-areas:
+          "topbar"
+          "parts"
+          "main"
+          "reactions"
+          "controls";
+      }
+      .chat-panel { display: none; }
+      .participants-strip { --tile-h: 90px; }
+      .participant-tile { width: 80px; }
+      .main-area { padding: 6px 8px; }
+      .controls-bar { padding: 0 8px; }
+      .controls-left { min-width: unset; }
+      .controls-right { display: none; }
+      .room-link-card { max-width: 140px; padding: 4px 8px; }
+      .room-link-code { font-size: .72rem; letter-spacing: 1px; }
+      .ctrl-btn { min-width: 52px; padding: 6px 8px; font-size: .6rem; }
+      .ctrl-btn svg { width: 16px; height: 16px; }
+      .ctrl-live { padding: 6px 14px; min-width: 80px; }
+      .ctrl-sep { margin: 0 2px; }
+      .topbar { padding: 0 12px; }
+      .stat-chip { padding: 4px 8px; font-size: .7rem; }
+      .reactions-bar { padding: 4px 10px; }
+    }
   </style>
 </head>
 <body>
@@ -590,8 +620,8 @@
 <div class="controls-bar">
   <!-- LEFT: room link -->
   <div class="controls-left">
-    <div class="room-link-card" id="roomLinkCard" onclick="copyRoomCode()" title="Copiar código">
-      <span class="room-link-label">Código da sala</span>
+    <div class="room-link-card" id="roomLinkCard" onclick="copyRoomLink()" title="Copiar link">
+      <span class="room-link-label">Link da sala</span>
       <div class="room-link-row">
         <span class="room-link-code" id="roomLinkCode">—</span>
         <svg class="room-link-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
@@ -877,7 +907,7 @@
     document.getElementById('screenLabel').textContent = '● LIVE';
     const bar = document.getElementById('roomCodeBar');
     bar.textContent = id; bar.style.display = 'block';
-    document.getElementById('roomLinkCode').textContent = id;
+    document.getElementById('roomLinkCode').textContent = location.origin + '/viewer.html?room=' + id;
     document.getElementById('roomLinkCard').style.display = 'flex';
     liveStartTime = Date.now();
     const up = document.getElementById('uptimePill'); up.style.display='flex';
@@ -1091,9 +1121,15 @@
     const bar = document.getElementById('roomCodeBar');
     const prev = bar.textContent; bar.textContent='Copiado!';
     setTimeout(()=>bar.textContent=prev, 1500);
+  }
+
+  function copyRoomLink() {
+    if (!roomId) return;
+    const link = location.origin + '/viewer.html?room=' + roomId;
+    navigator.clipboard.writeText(link);
     const code = document.getElementById('roomLinkCode');
-    const prev2 = code.textContent; code.textContent='Copiado!';
-    setTimeout(()=>code.textContent=prev2, 1500);
+    const prev = code.textContent; code.textContent='Link copiado!';
+    setTimeout(()=>code.textContent=prev, 1500);
   }
 
   function updateViewerCount(n) { document.getElementById('viewerCountTop').textContent=n; }

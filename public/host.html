@@ -360,11 +360,11 @@
       min-width: 200px; display: flex; justify-content: flex-end;
     }
     .room-link-card {
-      display: none; flex-direction: column; gap: 2px;
+      display: none; flex-direction: column; gap: 3px;
       padding: 6px 12px; background: var(--card2);
       border: 1px solid var(--border2); border-radius: 10px;
       cursor: pointer; transition: border-color .2s, background .2s;
-      max-width: 190px;
+      max-width: 260px;
     }
     .room-link-card:hover { border-color: rgba(167,139,250,.5); background: rgba(124,58,237,.12); }
     .room-link-label {
@@ -374,8 +374,15 @@
     .room-link-row {
       display: flex; align-items: center; gap: 6px;
     }
+    .room-link-url {
+      font-size: .72rem; font-weight: 500; color: var(--accent2);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 210px;
+    }
+    .room-link-code-row {
+      display: flex; align-items: center; gap: 5px;
+    }
     .room-link-code {
-      font-size: .82rem; font-weight: 800; letter-spacing: 2px; color: var(--accent2);
+      font-size: .68rem; font-weight: 700; letter-spacing: 1.5px; color: var(--muted2);
     }
     .room-link-copy {
       color: var(--muted); transition: color .15s;
@@ -590,11 +597,15 @@
 <div class="controls-bar">
   <!-- LEFT: room link -->
   <div class="controls-left">
-    <div class="room-link-card" id="roomLinkCard" onclick="copyRoomCode()" title="Copiar código">
-      <span class="room-link-label">Código da sala</span>
+    <div class="room-link-card" id="roomLinkCard" onclick="copyRoomLink()" title="Copiar link">
+      <span class="room-link-label">Link da sala</span>
       <div class="room-link-row">
+        <span class="room-link-url" id="roomLinkUrl">—</span>
+        <svg class="room-link-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12" style="flex-shrink:0"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      </div>
+      <div class="room-link-code-row">
+        <span style="font-size:.58rem;color:var(--muted);">Código:</span>
         <span class="room-link-code" id="roomLinkCode">—</span>
-        <svg class="room-link-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
       </div>
     </div>
   </div>
@@ -877,6 +888,7 @@
     document.getElementById('screenLabel').textContent = '● LIVE';
     const bar = document.getElementById('roomCodeBar');
     bar.textContent = id; bar.style.display = 'block';
+    document.getElementById('roomLinkUrl').textContent = location.origin + '/viewer.html?room=' + id;
     document.getElementById('roomLinkCode').textContent = id;
     document.getElementById('roomLinkCard').style.display = 'flex';
     liveStartTime = Date.now();
@@ -1039,6 +1051,7 @@
     document.getElementById('btnGoLive').disabled=true;
     document.getElementById('roomCodeBar').style.display='none';
     document.getElementById('roomLinkCard').style.display='none';
+    document.getElementById('roomLinkUrl').textContent='—';
     document.getElementById('roomLinkCode').textContent='—';
     document.getElementById('uptimePill').style.display='none';
     viewers={}; renderTiles(); closeEndModal(); roomId=null;
@@ -1091,9 +1104,15 @@
     const bar = document.getElementById('roomCodeBar');
     const prev = bar.textContent; bar.textContent='Copiado!';
     setTimeout(()=>bar.textContent=prev, 1500);
-    const code = document.getElementById('roomLinkCode');
-    const prev2 = code.textContent; code.textContent='Copiado!';
-    setTimeout(()=>code.textContent=prev2, 1500);
+  }
+
+  function copyRoomLink() {
+    if (!roomId) return;
+    const link = location.origin + '/viewer.html?room=' + roomId;
+    navigator.clipboard.writeText(link);
+    const urlEl = document.getElementById('roomLinkUrl');
+    const prev = urlEl.textContent; urlEl.textContent = 'Link copiado!';
+    setTimeout(() => urlEl.textContent = prev, 1500);
   }
 
   function updateViewerCount(n) { document.getElementById('viewerCountTop').textContent=n; }

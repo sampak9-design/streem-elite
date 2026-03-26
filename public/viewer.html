@@ -249,37 +249,42 @@
 
     /* ── MOBILE ── */
     @media (max-width: 640px) {
-      .join-card { padding: 28px 20px; }
+      /* join */
+      .join-card { padding: 28px 20px; width: 100%; max-width: 400px; }
+
+      /* topbar */
       .topbar { padding: 8px 14px; gap: 8px; }
       .stream-title { font-size: 0.82rem; max-width: 120px; }
       .stat-pill span:last-child { display: none; }
       .stat-pill { padding: 3px 9px; }
 
+      /* stacked layout */
       .content { flex-direction: column; }
-      .video-area { flex: none; width: 100%; aspect-ratio: 16/9; }
-      #remoteVideo { height: 100%; }
+      .video-area { flex: 1; width: 100%; min-height: 0; }
+      #remoteVideo { width: 100%; height: 100%; object-fit: contain; }
 
-      /* chat slides up — stops exactly above the bottom bar */
+      /* chat overlay */
       .chat-panel {
-        width: 100%; border-left: none; border-top: 1px solid var(--border); flex: 1;
-        position: fixed; bottom: 72px; left: 0; right: 0; height: 55vh;
-        z-index: 20; transform: translateY(calc(100% + 72px)); transition: transform .3s ease;
-        border-radius: 16px 16px 0 0; box-shadow: 0 -8px 40px rgba(0,0,0,.5);
+        width: 100%; border-left: none; border-top: 1px solid var(--border);
+        position: fixed; bottom: 90px; left: 0; right: 0; height: 52vh;
+        z-index: 20; transform: translateY(150%); transition: transform .25s ease;
+        border-radius: 16px 16px 0 0; box-shadow: 0 -8px 30px rgba(0,0,0,.5);
       }
       .chat-panel.open { transform: translateY(0); }
       .chat-close-btn { display: block; }
 
+      /* video buttons */
       .video-btns { bottom: 8px; right: 8px; gap: 5px; }
       .video-btn { padding: 4px 7px; font-size: 0.68rem; }
       .video-btn span { display: none; }
 
-      /* bottom bar fills full width on mobile */
-      .bottom-bar { gap: 6px; padding: 10px 8px; justify-content: space-around; }
+      /* bottom bar */
+      .bottom-bar { gap: 6px; padding: 10px 8px 20px; justify-content: space-around; }
       .ctrl-btn  { width: 48px; height: 48px; }
       .ctrl-btn.leave { width: 52px; height: 52px; }
       .ctrl-label { font-size: 0.6rem; }
 
-      #selfPreview { bottom: 86px; }
+      #selfPreview { bottom: 100px; }
     }
   </style>
 </head>

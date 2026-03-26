@@ -344,12 +344,43 @@
     /* ── CONTROLS BAR ──────────────────────────────────────────────────────── */
     .controls-bar {
       grid-area: controls;
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-      padding: 0 20px;
+      display: flex; align-items: center; justify-content: space-between; gap: 6px;
+      padding: 0 16px;
       background: linear-gradient(0deg, rgba(13,13,26,.98) 0%, rgba(13,13,26,.92) 100%);
       border-top: 1px solid var(--border);
       backdrop-filter: blur(20px);
     }
+    .controls-left {
+      display: flex; align-items: center; gap: 10px; min-width: 200px;
+    }
+    .controls-center {
+      display: flex; align-items: center; gap: 6px;
+    }
+    .controls-right {
+      min-width: 200px; display: flex; justify-content: flex-end;
+    }
+    .room-link-card {
+      display: none; flex-direction: column; gap: 2px;
+      padding: 6px 12px; background: var(--card2);
+      border: 1px solid var(--border2); border-radius: 10px;
+      cursor: pointer; transition: border-color .2s, background .2s;
+      max-width: 190px;
+    }
+    .room-link-card:hover { border-color: rgba(167,139,250,.5); background: rgba(124,58,237,.12); }
+    .room-link-label {
+      font-size: .58rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .6px; color: var(--muted);
+    }
+    .room-link-row {
+      display: flex; align-items: center; gap: 6px;
+    }
+    .room-link-code {
+      font-size: .82rem; font-weight: 800; letter-spacing: 2px; color: var(--accent2);
+    }
+    .room-link-copy {
+      color: var(--muted); transition: color .15s;
+    }
+    .room-link-card:hover .room-link-copy { color: var(--accent2); }
     .ctrl-btn {
       display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
       padding: 8px 16px; border-radius: 10px;
@@ -557,27 +588,44 @@
 
 <!-- BOTTOM CONTROLS -->
 <div class="controls-bar">
-  <button class="ctrl-btn ctrl-ghost" id="btnScreen" onclick="toggleScreenShare()">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-    Tela
-  </button>
-  <button class="ctrl-btn ctrl-ghost" id="btnWebcam" onclick="toggleWebcam()">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
-    Webcam
-  </button>
-  <button class="ctrl-btn ctrl-ghost" id="btnMic" onclick="toggleMic()">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-    Microfone
-  </button>
-  <div class="ctrl-sep"></div>
-  <button class="ctrl-btn ctrl-live" id="btnGoLive" onclick="goLive()" disabled>
-    <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><circle cx="12" cy="12" r="8"/></svg>
-    Ir ao Vivo
-  </button>
-  <button class="ctrl-btn ctrl-end" id="btnEndLive" onclick="showEndModal()" style="display:none">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-    Encerrar
-  </button>
+  <!-- LEFT: room link -->
+  <div class="controls-left">
+    <div class="room-link-card" id="roomLinkCard" onclick="copyRoomCode()" title="Copiar código">
+      <span class="room-link-label">Código da sala</span>
+      <div class="room-link-row">
+        <span class="room-link-code" id="roomLinkCode">—</span>
+        <svg class="room-link-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTER: controls -->
+  <div class="controls-center">
+    <button class="ctrl-btn ctrl-ghost" id="btnScreen" onclick="toggleScreenShare()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      Tela
+    </button>
+    <button class="ctrl-btn ctrl-ghost" id="btnWebcam" onclick="toggleWebcam()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+      Webcam
+    </button>
+    <button class="ctrl-btn ctrl-ghost" id="btnMic" onclick="toggleMic()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+      Microfone
+    </button>
+    <div class="ctrl-sep"></div>
+    <button class="ctrl-btn ctrl-live" id="btnGoLive" onclick="goLive()" disabled>
+      <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><circle cx="12" cy="12" r="8"/></svg>
+      Ir ao Vivo
+    </button>
+    <button class="ctrl-btn ctrl-end" id="btnEndLive" onclick="showEndModal()" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+      Encerrar
+    </button>
+  </div>
+
+  <!-- RIGHT: spacer -->
+  <div class="controls-right"></div>
 </div>
 
 <!-- END MODAL -->
@@ -829,6 +877,8 @@
     document.getElementById('screenLabel').textContent = '● LIVE';
     const bar = document.getElementById('roomCodeBar');
     bar.textContent = id; bar.style.display = 'block';
+    document.getElementById('roomLinkCode').textContent = id;
+    document.getElementById('roomLinkCard').style.display = 'flex';
     liveStartTime = Date.now();
     const up = document.getElementById('uptimePill'); up.style.display='flex';
     uptimeInterval = setInterval(updateUptime, 1000);
@@ -988,6 +1038,8 @@
     document.getElementById('btnGoLive').style.display='flex';
     document.getElementById('btnGoLive').disabled=true;
     document.getElementById('roomCodeBar').style.display='none';
+    document.getElementById('roomLinkCard').style.display='none';
+    document.getElementById('roomLinkCode').textContent='—';
     document.getElementById('uptimePill').style.display='none';
     viewers={}; renderTiles(); closeEndModal(); roomId=null;
   }
@@ -1039,6 +1091,9 @@
     const bar = document.getElementById('roomCodeBar');
     const prev = bar.textContent; bar.textContent='Copiado!';
     setTimeout(()=>bar.textContent=prev, 1500);
+    const code = document.getElementById('roomLinkCode');
+    const prev2 = code.textContent; code.textContent='Copiado!';
+    setTimeout(()=>code.textContent=prev2, 1500);
   }
 
   function updateViewerCount(n) { document.getElementById('viewerCountTop').textContent=n; }

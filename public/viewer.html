@@ -810,13 +810,26 @@
 
   // ── FULLSCREEN ────────────────────────────────────────────────────────────
   function toggleFullscreen() {
-    const el = document.querySelector('.video-area');
+    const vid = document.getElementById('remoteVideo');
+    const area = document.querySelector('.video-area');
+
+    // iOS Safari: usa webkitEnterFullscreen no <video>
+    if (vid.webkitEnterFullscreen) {
+      if (document.webkitFullscreenElement || vid.webkitDisplayingFullscreen) {
+        vid.webkitExitFullscreen ? vid.webkitExitFullscreen() : document.webkitExitFullscreen();
+      } else {
+        vid.webkitEnterFullscreen();
+      }
+      return;
+    }
+
+    // Android / Chrome: fullscreen normal
     if (!document.fullscreenElement) {
-      el.requestFullscreen().then(() => {
+      (area.requestFullscreen || area.webkitRequestFullscreen).call(area).then(() => {
         try { screen.orientation.lock('landscape').catch(()=>{}); } catch(e) {}
       }).catch(()=>{});
     } else {
-      document.exitFullscreen().then(() => {
+      (document.exitFullscreen || document.webkitExitFullscreen).call(document).then(() => {
         try { screen.orientation.unlock(); } catch(e) {}
       }).catch(()=>{});
     }

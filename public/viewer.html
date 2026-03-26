@@ -20,23 +20,12 @@
       --live:    #ff3b3b;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    /* iOS Safari fix: -webkit-fill-available = real visible height */
-    html { height: -webkit-fill-available; }
-    body {
-      background: var(--bg); color: var(--text);
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      min-height: 100vh;
-      min-height: -webkit-fill-available;
-      height: 100dvh;
-      display: flex; flex-direction: column; overflow: hidden;
-    }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
     /* ── JOIN SCREEN ── */
     #joinScreen {
       display: flex; align-items: center; justify-content: center;
       flex: 1; padding: 20px;
-      overflow-y: auto; /* scrollable if keyboard pushes content */
     }
     .join-card {
       background: var(--card); border: 1px solid var(--border); border-radius: 16px;
@@ -260,61 +249,37 @@
 
     /* ── MOBILE ── */
     @media (max-width: 640px) {
-      /* join card */
-      .join-card { padding: 24px 18px; width: 100%; border-radius: 12px; }
-
-      /* topbar */
-      .topbar { padding: 8px 12px; gap: 6px; }
-      .stream-title { font-size: 0.8rem; max-width: 110px; }
+      .join-card { padding: 28px 20px; }
+      .topbar { padding: 8px 14px; gap: 8px; }
+      .stream-title { font-size: 0.82rem; max-width: 120px; }
       .stat-pill span:last-child { display: none; }
-      .stat-pill { padding: 3px 8px; font-size: 0.75rem; }
-      .live-badge { padding: 3px 10px; font-size: 0.7rem; }
+      .stat-pill { padding: 3px 9px; }
 
-      /* content: video stacks on top */
       .content { flex-direction: column; }
+      .video-area { flex: none; width: 100%; aspect-ratio: 16/9; }
+      #remoteVideo { height: 100%; }
 
-      /* video fills all space between topbar and bottom-bar */
-      .video-area { flex: 1; width: 100%; min-height: 0; }
-      #remoteVideo { width: 100%; height: 100%; object-fit: contain; }
-
-      /* video overlay buttons */
-      .video-btns { bottom: 8px; right: 8px; gap: 5px; }
-      .video-btn { padding: 4px 7px; font-size: 0.68rem; }
-      .video-btn span { display: none; }
-
-      /* bottom bar */
-      .bottom-bar {
-        gap: 4px;
-        padding: 10px 6px 18px;
-        justify-content: space-around;
-        flex-shrink: 0;
-      }
-      .ctrl-btn  { width: 46px; height: 46px; }
-      .ctrl-btn svg { width: 20px; height: 20px; }
-      .ctrl-btn.leave { width: 50px; height: 50px; }
-      .ctrl-label { font-size: 0.58rem; }
-
-      /* chat: slides up as overlay above bottom-bar */
+      /* chat slides up — stops exactly above the bottom bar */
       .chat-panel {
-        width: 100%;
-        border-left: none;
-        border-top: 1px solid var(--border);
-        /* position fixed, bottom = height of bottom-bar (~88px) */
-        position: fixed;
-        bottom: 88px;
-        left: 0; right: 0;
-        height: 50vh;
-        z-index: 20;
-        transform: translateY(calc(100% + 88px));
-        transition: transform .25s ease;
-        border-radius: 16px 16px 0 0;
-        box-shadow: 0 -6px 30px rgba(0,0,0,.6);
+        width: 100%; border-left: none; border-top: 1px solid var(--border); flex: 1;
+        position: fixed; bottom: 72px; left: 0; right: 0; height: 55vh;
+        z-index: 20; transform: translateY(calc(100% + 72px)); transition: transform .3s ease;
+        border-radius: 16px 16px 0 0; box-shadow: 0 -8px 40px rgba(0,0,0,.5);
       }
       .chat-panel.open { transform: translateY(0); }
       .chat-close-btn { display: block; }
 
-      /* self camera preview */
-      #selfPreview { bottom: 100px; right: 10px; width: 88px; height: 66px; }
+      .video-btns { bottom: 8px; right: 8px; gap: 5px; }
+      .video-btn { padding: 4px 7px; font-size: 0.68rem; }
+      .video-btn span { display: none; }
+
+      /* bottom bar fills full width on mobile */
+      .bottom-bar { gap: 6px; padding: 10px 8px; justify-content: space-around; }
+      .ctrl-btn  { width: 48px; height: 48px; }
+      .ctrl-btn.leave { width: 52px; height: 52px; }
+      .ctrl-label { font-size: 0.6rem; }
+
+      #selfPreview { bottom: 86px; }
     }
   </style>
 </head>
@@ -814,46 +779,12 @@
   document.addEventListener('click', (e) => {
     if (window.innerWidth > 640) return;
     const panel = document.getElementById('chatPanel');
-    if (chatOpen && !panel.contains(e.target) &&
-        !document.getElementById('ctrlChat').contains(e.target)) {
+    const btn   = document.getElementById('chatToggleBtn');
+    if (chatOpen && !panel.contains(e.target) && !btn.contains(e.target)) {
       chatOpen = false;
       panel.classList.remove('open');
-      document.getElementById('ctrlChat').classList.remove('active');
     }
   });
-
-  // ── KEYBOARD HANDLER (iOS + Android) ─────────────────────────────────────
-  // When virtual keyboard opens, push chat panel up so input stays visible
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', onViewportResize);
-    window.visualViewport.addEventListener('scroll', onViewportResize);
-  }
-
-  function onViewportResize() {
-    if (window.innerWidth > 640) return;
-    const vv = window.visualViewport;
-    const keyboardH = Math.max(0, window.innerHeight - vv.height - vv.pageTop);
-    const bar   = document.querySelector('.bottom-bar');
-    const panel = document.getElementById('chatPanel');
-
-    if (keyboardH > 80) {
-      // Keyboard is open — lift bar and chat above keyboard
-      bar.style.transform   = `translateY(-${keyboardH}px)`;
-      bar.style.transition  = 'transform .15s';
-      if (chatOpen) {
-        panel.style.bottom     = `${88 + keyboardH}px`;
-        panel.style.height     = `${Math.max(200, window.innerHeight * 0.45 - keyboardH)}px`;
-        panel.style.transform  = 'translateY(0)';
-      }
-    } else {
-      // Keyboard closed — reset
-      bar.style.transform  = '';
-      if (chatOpen) {
-        panel.style.bottom  = '';
-        panel.style.height  = '';
-      }
-    }
-  }
 
   // ── FULLSCREEN ────────────────────────────────────────────────────────────
   function toggleFullscreen() {

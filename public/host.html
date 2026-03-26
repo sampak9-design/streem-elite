@@ -1,399 +1,483 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Streem Elite — Host</title>
   <script src="/socket.io/socket.io.js"></script>
   <style>
     :root {
       --bg:      #0a0a0f;
       --surface: #12121a;
-      --card:    #1a1a2e;
+      --card:    #1e1e2e;
       --border:  #2a2a3e;
       --accent:  #7c3aed;
       --accent2: #a855f7;
       --green:   #22c55e;
       --red:     #ef4444;
-      --yellow:  #eab308;
       --text:    #e2e8f0;
       --muted:   #64748b;
       --live:    #ff3b3b;
+      --tile-h:  140px;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      height: 100vh; display: grid; overflow: hidden;
+      grid-template-rows: 52px auto 1fr auto 64px;
+      grid-template-columns: 1fr 300px;
+      grid-template-areas:
+        "topbar   topbar"
+        "parts    chat"
+        "main     chat"
+        "reactions chat"
+        "controls controls";
+    }
 
+    /* ── TOPBAR ── */
     .topbar {
+      grid-area: topbar;
       display: flex; align-items: center; justify-content: space-between;
-      padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0;
+      padding: 0 16px; background: var(--surface); border-bottom: 1px solid var(--border);
     }
-    .topbar .logo { font-size: 1.1rem; font-weight: 700; color: var(--accent2); letter-spacing: 1px; }
-    .status-badge {
-      display: flex; align-items: center; gap: 8px;
-      padding: 5px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 700;
-      background: var(--card); border: 1px solid var(--border); color: var(--muted); transition: all .3s;
+    .logo { font-size: 1rem; font-weight: 800; color: var(--accent2); letter-spacing: 1px; }
+    .topbar-center { display: flex; align-items: center; gap: 10px; }
+    .stream-name { font-size: 0.85rem; font-weight: 600; color: var(--text); max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .live-pill {
+      display: flex; align-items: center; gap: 5px;
+      background: rgba(255,59,59,.15); border: 1px solid var(--live);
+      border-radius: 20px; padding: 3px 10px; font-size: 0.7rem; font-weight: 800; color: var(--live);
     }
-    .status-badge.live { background: rgba(255,59,59,.15); border-color: var(--live); color: var(--live); }
-    .status-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
-    .status-badge.live .dot { background: var(--live); animation: pulse 1s infinite; }
+    .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--live); animation: pulse 1s infinite; }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
-    .topbar-right { display: flex; align-items: center; gap: 12px; }
+    .topbar-right { display: flex; align-items: center; gap: 8px; }
     .stat-pill {
-      display: flex; align-items: center; gap: 6px;
+      display: flex; align-items: center; gap: 5px;
       background: var(--card); border: 1px solid var(--border);
-      border-radius: 20px; padding: 4px 12px; font-size: 0.8rem;
+      border-radius: 20px; padding: 3px 10px; font-size: 0.78rem;
     }
-    .stat-pill svg { width: 14px; height: 14px; }
-    .stat-pill .val { font-weight: 700; color: var(--accent2); }
+    .stat-pill svg { width: 13px; height: 13px; }
+    .stat-pill b { color: var(--accent2); }
+    .uptime-pill { display: none; }
+    .icon-btn {
+      width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--card); color: var(--muted); cursor: pointer;
+      display: flex; align-items: center; justify-content: center; transition: all .2s;
+    }
+    .icon-btn:hover { border-color: var(--accent); color: var(--accent2); }
+    .icon-btn svg { width: 16px; height: 16px; }
 
-    .main { display: flex; flex: 1; overflow: hidden; }
-
-    .left-panel { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 16px; overflow-y: auto; }
-
-    .preview-wrapper {
-      position: relative; background: #000; border-radius: 12px;
-      border: 1px solid var(--border); overflow: hidden;
-      aspect-ratio: 16/9; width: 100%; max-height: 420px;
+    /* ── PARTICIPANTS STRIP ── */
+    .participants-strip {
+      grid-area: parts;
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 12px; background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto; flex-shrink: 0;
+      scrollbar-width: none;
+    }
+    .participants-strip::-webkit-scrollbar { display: none; }
+    .participant-tile {
+      position: relative; flex-shrink: 0;
+      width: 120px; height: var(--tile-h); border-radius: 10px; overflow: hidden;
+      background: var(--card); border: 1px solid var(--border);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      cursor: pointer; transition: border .2s;
+    }
+    .participant-tile:hover { border-color: var(--accent); }
+    .participant-tile.has-video { background: #000; }
+    .participant-tile video { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .tile-avatar {
+      width: 52px; height: 52px; border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem; font-weight: 800; color: #fff; margin-bottom: 6px;
+    }
+    .tile-name {
+      font-size: 0.7rem; color: var(--text); font-weight: 500;
+      text-align: center; padding: 0 6px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;
+      position: absolute; bottom: 0; left: 0;
+      background: linear-gradient(transparent, rgba(0,0,0,.7));
+      padding: 12px 6px 5px;
+    }
+    .tile-mic-off {
+      position: absolute; top: 6px; right: 6px;
+      background: rgba(239,68,68,.85); border-radius: 50%;
+      width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
+    }
+    .tile-mic-off svg { width: 11px; height: 11px; color: #fff; }
+    .tile-kick {
+      position: absolute; top: 6px; left: 6px; display: none;
+      background: rgba(239,68,68,.85); border-radius: 4px;
+      padding: 2px 5px; font-size: 0.62rem; color: #fff; cursor: pointer; border: none;
+    }
+    .participant-tile:hover .tile-kick { display: block; }
+    .more-tile {
+      flex-shrink: 0; width: 80px; height: var(--tile-h); border-radius: 10px;
+      background: var(--card); border: 1px dashed var(--border);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 4px; color: var(--muted); font-size: 0.72rem; cursor: default;
+    }
+    .more-tile svg { width: 20px; height: 20px; }
+
+    /* ── MAIN AREA ── */
+    .main-area {
+      grid-area: main;
+      display: flex; gap: 8px; padding: 8px 12px;
+      overflow: hidden; min-height: 0;
+    }
+
+    /* Screen preview */
+    .screen-wrap {
+      flex: 1; position: relative; background: #000; border-radius: 12px; overflow: hidden;
+      display: flex; align-items: center; justify-content: center; min-width: 0;
     }
     #previewCanvas { width: 100%; height: 100%; object-fit: contain; display: block; }
-    .preview-overlay {
+    .screen-overlay {
       position: absolute; inset: 0; display: flex; flex-direction: column;
       align-items: center; justify-content: center; gap: 8px;
-      color: var(--muted); font-size: 0.9rem; pointer-events: none;
+      color: var(--muted); font-size: 0.9rem;
     }
-    .preview-overlay svg { width: 48px; height: 48px; opacity: .3; }
-    .preview-label {
-      position: absolute; top: 10px; left: 10px;
+    .screen-overlay svg { width: 48px; height: 48px; opacity: .25; }
+    .screen-label {
+      position: absolute; top: 10px; left: 12px;
       background: rgba(0,0,0,.7); border-radius: 6px; padding: 3px 10px;
-      font-size: 0.72rem; font-weight: 700; color: var(--muted);
+      font-size: 0.7rem; font-weight: 700; color: var(--muted);
     }
-    .preview-label.live { color: var(--live); }
+    .screen-label.live { color: var(--live); }
 
-    /* MIC INDICATOR */
-    .mic-indicator {
-      position: absolute; top: 10px; right: 10px;
-      background: rgba(0,0,0,.7); border-radius: 6px; padding: 4px 10px;
-      font-size: 0.72rem; display: none; align-items: center; gap: 5px;
+    /* Room code overlay on screen */
+    .room-code-overlay {
+      display: none; position: absolute; top: 10px; right: 12px;
+      background: rgba(0,0,0,.75); border: 1px dashed var(--accent);
+      border-radius: 8px; padding: 6px 14px;
+      font-size: 1.1rem; font-weight: 800; color: var(--accent2); letter-spacing: 3px;
+      cursor: pointer;
     }
-    .mic-indicator.active { display: flex; color: var(--green); }
-    .mic-indicator.muted  { display: flex; color: var(--red); }
-    .mic-bar { display: flex; gap: 2px; align-items: flex-end; height: 14px; }
-    .mic-bar span { width: 3px; background: var(--green); border-radius: 2px; transition: height .1s; }
+    .room-code-overlay:hover { background: rgba(124,58,237,.2); }
 
-    .controls-row { display: flex; gap: 8px; flex-wrap: wrap; }
-    .btn {
-      display: flex; align-items: center; gap: 7px;
-      padding: 8px 16px; border-radius: 8px; font-size: 0.83rem; font-weight: 600;
-      border: 1px solid transparent; cursor: pointer; transition: all .2s;
+    /* Webcam options panel (floats over screen) */
+    .cam-options-bar {
+      display: none; position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+      background: rgba(10,10,15,.9); border: 1px solid var(--border); border-radius: 10px;
+      padding: 8px 14px; gap: 10px; align-items: center; flex-wrap: wrap;
     }
-    .btn svg { width: 15px; height: 15px; flex-shrink: 0; }
-    .btn-primary { background: var(--accent); color: #fff; }
-    .btn-primary:hover { background: var(--accent2); }
-    .btn-danger  { background: var(--red); color: #fff; }
-    .btn-danger:hover { opacity: .85; }
-    .btn-ghost   { background: var(--card); border-color: var(--border); color: var(--text); }
-    .btn-ghost:hover { border-color: var(--accent); color: var(--accent2); }
-    .btn-active  { background: var(--card); border-color: var(--green); color: var(--green); }
-    .btn-muted   { background: rgba(239,68,68,.1); border-color: var(--red); color: var(--red); }
-    .btn:disabled { opacity: .4; cursor: not-allowed; }
-
-    /* MEDIA CONTROLS BAR */
-    .media-bar {
-      background: var(--card); border: 1px solid var(--border); border-radius: 10px;
-      padding: 12px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-    }
-    .media-bar-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; flex-shrink: 0; }
-    .divider { width: 1px; height: 24px; background: var(--border); }
-
-    /* webcam position picker */
-    .cam-pos-label { font-size: 0.75rem; color: var(--muted); margin-right: 4px; }
+    .cam-options-bar.show { display: flex; }
+    .cam-pos-label { font-size: 0.72rem; color: var(--muted); }
     .cam-pos-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
     .cam-pos-btn {
-      width: 22px; height: 16px; border-radius: 3px; border: 1px solid var(--border);
-      background: var(--surface); cursor: pointer; transition: all .15s;
+      width: 20px; height: 14px; border-radius: 2px;
+      border: 1px solid var(--border); background: var(--surface); cursor: pointer;
     }
-    .cam-pos-btn:hover { border-color: var(--accent); }
     .cam-pos-btn.sel { border-color: var(--accent2); background: rgba(124,58,237,.3); }
-
-    /* cam size slider */
-    .slider-wrap { display: flex; align-items: center; gap: 8px; }
-    .slider-wrap label { font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
+    .slider-wrap { display: flex; align-items: center; gap: 6px; font-size: 0.72rem; color: var(--muted); }
     input[type=range] {
-      -webkit-appearance: none; width: 80px; height: 4px;
+      -webkit-appearance: none; width: 70px; height: 3px;
       background: var(--border); border-radius: 2px; outline: none;
     }
     input[type=range]::-webkit-slider-thumb {
-      -webkit-appearance: none; width: 14px; height: 14px;
+      -webkit-appearance: none; width: 13px; height: 13px;
       border-radius: 50%; background: var(--accent2); cursor: pointer;
     }
+    .divider-v { width: 1px; height: 20px; background: var(--border); }
 
-    #setupPanel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
-    #setupPanel h3 { font-size: 0.9rem; color: var(--muted); margin-bottom: 14px; text-transform: uppercase; letter-spacing: .5px; }
-    .form-group { margin-bottom: 12px; }
-    .form-group label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 5px; }
-    .form-group input {
-      width: 100%; background: var(--surface); border: 1px solid var(--border);
-      border-radius: 6px; padding: 8px 12px; color: var(--text); font-size: 0.9rem; outline: none; transition: border .2s;
+    /* Reactions floating */
+    .reaction-float {
+      position: fixed; font-size: 2rem; pointer-events: none; z-index: 999;
+      animation: floatUp 2s ease forwards;
     }
-    .form-group input:focus { border-color: var(--accent); }
-
-    #roomCodeCard { display: none; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
-    .room-code-row { display: flex; align-items: center; gap: 10px; }
-    .room-code {
-      flex: 1; background: var(--surface); border: 1px dashed var(--accent);
-      border-radius: 8px; padding: 10px 14px; font-size: 1.4rem; font-weight: 800;
-      color: var(--accent2); letter-spacing: 4px; text-align: center;
+    @keyframes floatUp {
+      0%   { opacity: 1; transform: translateY(0) scale(1); }
+      100% { opacity: 0; transform: translateY(-180px) scale(1.5); }
     }
 
-    #viewerListCard { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
-    #viewerListCard h3 { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 12px; }
-    #viewerList { display: flex; flex-direction: column; gap: 6px; max-height: 140px; overflow-y: auto; }
-    .viewer-item {
-      display: flex; align-items: center; justify-content: space-between;
-      background: var(--surface); border-radius: 6px; padding: 7px 10px; font-size: 0.82rem;
+    /* ── CHAT ── */
+    .chat-panel {
+      grid-area: chat;
+      display: flex; flex-direction: column;
+      background: var(--surface); border-left: 1px solid var(--border); overflow: hidden;
     }
-    .viewer-item .vname { display: flex; align-items: center; gap: 8px; }
-    .viewer-avatar {
-      width: 26px; height: 26px; border-radius: 50%; background: var(--accent);
-      display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; color: #fff;
-    }
-    .kick-btn {
-      padding: 3px 8px; font-size: 0.72rem; border-radius: 4px;
-      background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3);
-      color: var(--red); cursor: pointer; transition: all .2s;
-    }
-    .kick-btn:hover { background: var(--red); color: #fff; }
-
-    .right-panel { width: 320px; display: flex; flex-direction: column; background: var(--surface); border-left: 1px solid var(--border); }
     .chat-header {
-      padding: 14px 16px; border-bottom: 1px solid var(--border);
-      font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--muted);
-      display: flex; align-items: center; gap: 8px;
+      padding: 12px 14px; border-bottom: 1px solid var(--border);
+      font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .5px; color: var(--muted);
+      display: flex; align-items: center; gap: 7px;
     }
-    .chat-header svg { width: 14px; height: 14px; }
+    .chat-header svg { width: 13px; height: 13px; }
+    #pinnedMsg {
+      display: none; padding: 7px 12px; background: rgba(124,58,237,.1);
+      border-left: 3px solid var(--accent); margin: 0 10px 6px; border-radius: 0 6px 6px 0;
+      font-size: 0.77rem;
+    }
+    #pinnedMsg .pl { font-size: 0.67rem; color: var(--accent2); font-weight: 700; margin-bottom: 2px; }
     #chatMessages {
-      flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px;
+      flex: 1; overflow-y: auto; padding: 10px;
+      display: flex; flex-direction: column; gap: 7px;
       scrollbar-width: thin; scrollbar-color: var(--border) transparent;
     }
     .chat-msg {
-      background: var(--card); border-radius: 8px; padding: 8px 10px;
-      font-size: 0.83rem; line-height: 1.4; border: 1px solid var(--border); animation: msgIn .2s ease;
+      background: var(--card); border-radius: 8px; padding: 7px 10px;
+      font-size: 0.81rem; line-height: 1.4; border: 1px solid var(--border); animation: msgIn .2s;
     }
     .chat-msg.host-msg { border-color: rgba(124,58,237,.4); background: rgba(124,58,237,.08); }
     @keyframes msgIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
-    .msg-author { font-weight: 700; color: var(--accent2); font-size: 0.78rem; margin-bottom: 2px; }
-    .msg-author.is-host::after { content: ' HOST'; font-size: 0.65rem; background: var(--accent); color: #fff; border-radius: 3px; padding: 1px 4px; margin-left: 4px; }
-    .msg-time { float: right; font-size: 0.7rem; color: var(--muted); margin-left: 6px; }
+    .msg-author { font-weight: 700; color: var(--accent2); font-size: 0.76rem; margin-bottom: 2px; }
+    .msg-author.is-host::after { content: ' HOST'; font-size: 0.62rem; background: var(--accent); color: #fff; border-radius: 3px; padding: 1px 4px; margin-left: 3px; }
+    .msg-time { float: right; font-size: 0.68rem; color: var(--muted); margin-left: 4px; }
     .pin-msg-btn {
-      display: none; font-size: 0.7rem; padding: 2px 6px;
+      display: none; font-size: 0.68rem; padding: 2px 5px;
       background: rgba(124,58,237,.2); border: 1px solid rgba(124,58,237,.3);
-      color: var(--accent2); border-radius: 4px; cursor: pointer; margin-top: 4px;
+      color: var(--accent2); border-radius: 4px; cursor: pointer; margin-top: 3px;
     }
     .chat-msg:hover .pin-msg-btn { display: inline-block; }
-    #pinnedMsg {
-      display: none; padding: 8px 12px; background: rgba(124,58,237,.12);
-      border-left: 3px solid var(--accent); margin: 0 12px 8px; border-radius: 0 6px 6px 0; font-size: 0.8rem;
-    }
-    #pinnedMsg .pinned-label { font-size: 0.7rem; color: var(--accent2); font-weight: 700; margin-bottom: 3px; }
-    .chat-input-row { padding: 12px; border-top: 1px solid var(--border); display: flex; gap: 8px; }
+    .chat-input-row { padding: 10px; border-top: 1px solid var(--border); display: flex; gap: 7px; }
     .chat-input-row input {
       flex: 1; background: var(--card); border: 1px solid var(--border);
-      border-radius: 6px; padding: 8px 12px; color: var(--text); font-size: 0.85rem; outline: none; transition: border .2s;
+      border-radius: 6px; padding: 7px 10px; color: var(--text); font-size: 0.82rem; outline: none; transition: border .2s;
     }
     .chat-input-row input:focus { border-color: var(--accent); }
-    .send-btn { padding: 8px 14px; background: var(--accent); border: none; border-radius: 6px; color: #fff; cursor: pointer; }
+    .send-btn { padding: 7px 12px; background: var(--accent); border: none; border-radius: 6px; color: #fff; cursor: pointer; }
     .send-btn:hover { background: var(--accent2); }
 
-    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7); align-items: center; justify-content: center; z-index: 100; }
-    .modal-overlay.open { display: flex; }
-    .modal { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 28px; width: 420px; max-width: 95vw; }
-    .modal h2 { font-size: 1.1rem; margin-bottom: 6px; }
-    .modal p { color: var(--muted); font-size: 0.85rem; margin-bottom: 20px; }
-    .modal-btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+    /* ── REACTIONS BAR ── */
+    .reactions-bar {
+      grid-area: reactions;
+      display: flex; align-items: center; gap: 4px;
+      padding: 6px 14px; background: var(--surface); border-top: 1px solid var(--border);
+      overflow-x: auto; scrollbar-width: none;
+    }
+    .reactions-bar::-webkit-scrollbar { display: none; }
+    .reaction-btn {
+      font-size: 1.3rem; padding: 4px 8px; border-radius: 8px; border: none;
+      background: transparent; cursor: pointer; transition: background .15s; line-height: 1;
+    }
+    .reaction-btn:hover { background: var(--card); transform: scale(1.2); }
 
-    .participant-tile {
-      position: relative; width: 120px; border-radius: 8px; overflow: hidden;
-      background: #000; border: 1px solid var(--border);
+    /* ── BOTTOM CONTROLS ── */
+    .controls-bar {
+      grid-area: controls;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 0 16px; background: var(--surface); border-top: 1px solid var(--border);
     }
-    .participant-tile video { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; }
-    .participant-tile .ptile-name {
-      position: absolute; bottom: 0; left: 0; right: 0;
-      background: rgba(0,0,0,.7); font-size: .68rem; padding: 3px 6px;
-      color: #fff; display: flex; align-items: center; gap: 4px;
+    .ctrl-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 14px; border-radius: 8px; font-size: 0.8rem; font-weight: 600;
+      border: 1px solid transparent; cursor: pointer; transition: all .2s; color: var(--text);
     }
-    .ptile-audio-only {
-      width: 120px; height: 70px; border-radius: 8px;
-      background: var(--card); border: 1px solid var(--border);
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 4px; font-size: .72rem; color: var(--muted);
-    }
-    .ptile-audio-only svg { width: 20px; height: 20px; color: var(--green); }
+    .ctrl-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+    .ctrl-ghost  { background: var(--card); border-color: var(--border); }
+    .ctrl-ghost:hover { border-color: var(--accent); color: var(--accent2); }
+    .ctrl-active { background: var(--card); border-color: var(--green); color: var(--green); }
+    .ctrl-muted  { background: rgba(239,68,68,.1); border-color: var(--red); color: var(--red); }
+    .ctrl-live   { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .ctrl-live:hover { background: var(--accent2); }
+    .ctrl-end    { background: var(--red); color: #fff; border-color: var(--red); }
+    .ctrl-end:hover { opacity: .85; }
+    .ctrl-btn:disabled { opacity: .4; cursor: not-allowed; }
+    .ctrl-sep { width: 1px; height: 28px; background: var(--border); margin: 0 4px; }
 
-    ::-webkit-scrollbar { width: 5px; }
+    /* ── SETUP MODAL ── */
+    .modal-bg {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7);
+      align-items: center; justify-content: center; z-index: 100;
+    }
+    .modal-bg.open { display: flex; }
+    .modal {
+      background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+      padding: 28px; width: 420px; max-width: 95vw;
+    }
+    .modal h2 { font-size: 1rem; margin-bottom: 14px; }
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 5px; }
+    .form-group input {
+      width: 100%; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 6px; padding: 8px 12px; color: var(--text); font-size: 0.88rem; outline: none; transition: border .2s;
+    }
+    .form-group input:focus { border-color: var(--accent); }
+    .modal-btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+
+    /* Room code card (shown after going live) */
+    #roomCodeBar {
+      display: none; position: absolute; bottom: 10px; right: 12px;
+      background: rgba(0,0,0,.8); border: 1px dashed var(--accent);
+      border-radius: 8px; padding: 6px 14px; cursor: pointer;
+      font-size: 1rem; font-weight: 800; color: var(--accent2); letter-spacing: 3px;
+    }
+
+    /* Participant tiles scrollbar */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+
+    /* Mic indicator on screen */
+    .mic-indicator {
+      position: absolute; top: 10px; right: 54px;
+      background: rgba(0,0,0,.7); border-radius: 6px; padding: 3px 8px;
+      font-size: 0.7rem; display: none; align-items: center; gap: 4px;
+    }
+    .mic-indicator.active { display: flex; color: var(--green); }
+    .mic-indicator.muted  { display: flex; color: var(--red); }
+    .mic-bar { display: flex; gap: 2px; align-items: flex-end; height: 12px; }
+    .mic-bar span { width: 3px; background: var(--green); border-radius: 2px; transition: height .1s; }
   </style>
 </head>
 <body>
 
+<!-- TOP BAR -->
 <div class="topbar">
   <div class="logo">⬡ STREEM ELITE</div>
-  <div id="statusBadge" class="status-badge">
-    <span class="dot"></span><span id="statusText">Offline</span>
+  <div class="topbar-center">
+    <span class="stream-name" id="topStreamName">—</span>
+    <div class="live-pill" id="livePill" style="display:none">
+      <div class="live-dot"></div>AO VIVO
+    </div>
   </div>
   <div class="topbar-right">
     <div class="stat-pill">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      <span class="val" id="viewerCountTop">0</span>
-      <span style="color:var(--muted)">espectadores</span>
+      <b id="viewerCountTop">0</b>
     </div>
-    <div class="stat-pill" id="uptimePill" style="display:none">
+    <div class="stat-pill uptime-pill" id="uptimePill">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-      <span class="val" id="uptimeDisplay">00:00</span>
+      <b id="uptimeDisplay">00:00</b>
     </div>
   </div>
 </div>
 
-<div class="main">
-  <div class="left-panel">
+<!-- PARTICIPANTS STRIP -->
+<div class="participants-strip" id="participantsStrip">
+  <div style="color:var(--muted);font-size:.78rem;padding:0 4px;">Nenhum espectador online</div>
+</div>
 
-    <!-- PREVIEW (canvas) -->
-    <div class="preview-wrapper">
-      <div id="previewOverlay" class="preview-overlay">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
-        </svg>
-        <span>Nenhuma tela compartilhada</span>
-      </div>
-      <canvas id="previewCanvas"></canvas>
-      <div id="previewLabel" class="preview-label">PREVIEW</div>
-      <div id="micIndicator" class="mic-indicator">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-        <span id="micLabel">MIC</span>
-        <div class="mic-bar" id="micBar">
-          <span id="b1" style="height:4px"></span>
-          <span id="b2" style="height:4px"></span>
-          <span id="b3" style="height:4px"></span>
-          <span id="b4" style="height:4px"></span>
-        </div>
+<!-- MAIN AREA -->
+<div class="main-area">
+  <!-- Screen preview -->
+  <div class="screen-wrap">
+    <div class="screen-overlay" id="screenOverlay">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+      </svg>
+      <span>Clique em Tela para compartilhar</span>
+    </div>
+    <canvas id="previewCanvas"></canvas>
+    <div class="screen-label" id="screenLabel">PREVIEW</div>
+    <div id="micIndicator" class="mic-indicator">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
+      <span id="micLabel">MIC</span>
+      <div class="mic-bar">
+        <span id="b1" style="height:3px"></span>
+        <span id="b2" style="height:3px"></span>
+        <span id="b3" style="height:3px"></span>
+        <span id="b4" style="height:3px"></span>
       </div>
     </div>
+    <!-- Room code shown over screen when live -->
+    <div id="roomCodeBar" onclick="copyRoomCode()" title="Copiar código"></div>
 
-    <!-- MAIN CONTROLS -->
-    <div class="controls-row">
-      <button id="btnShare" class="btn btn-ghost" onclick="startScreenShare()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-        Tela
-      </button>
-      <button id="btnWebcam" class="btn btn-ghost" onclick="toggleWebcam()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
-        Webcam
-      </button>
-      <button id="btnMic" class="btn btn-ghost" onclick="toggleMic()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-        Microfone
-      </button>
-      <button id="btnGoLive" class="btn btn-primary" onclick="goLive()" disabled>
-        <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
-        Ir ao Vivo
-      </button>
-      <button id="btnEndLive" class="btn btn-danger" onclick="showEndModal()" style="display:none">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-        Encerrar
-      </button>
-    </div>
-
-    <!-- WEBCAM OPTIONS (shown when webcam is on) -->
-    <div id="webcamOptions" class="media-bar" style="display:none">
-      <span class="media-bar-label">Webcam</span>
-      <div class="divider"></div>
+    <!-- Webcam options bar -->
+    <div class="cam-options-bar" id="camOptionsBar">
       <span class="cam-pos-label">Posição:</span>
       <div class="cam-pos-grid">
-        <button class="cam-pos-btn" title="Topo-Esq"  onclick="setCamPos('tl')"></button>
-        <button class="cam-pos-btn sel" title="Topo-Dir"  onclick="setCamPos('tr')"></button>
-        <button class="cam-pos-btn" title="Baixo-Esq" onclick="setCamPos('bl')"></button>
-        <button class="cam-pos-btn" title="Baixo-Dir" onclick="setCamPos('br')"></button>
+        <button class="cam-pos-btn" title="↖" onclick="setCamPos('tl')"></button>
+        <button class="cam-pos-btn sel" title="↗" onclick="setCamPos('tr')"></button>
+        <button class="cam-pos-btn" title="↙" onclick="setCamPos('bl')"></button>
+        <button class="cam-pos-btn" title="↘" onclick="setCamPos('br')"></button>
       </div>
-      <div class="divider"></div>
+      <div class="divider-v"></div>
       <div class="slider-wrap">
-        <label>Tamanho</label>
-        <input type="range" id="camSizeSlider" min="10" max="40" value="22" oninput="camSizePct=+this.value" />
+        Tamanho
+        <input type="range" id="camSizeSlider" min="10" max="40" value="22" oninput="camSizePct=+this.value"/>
       </div>
-      <div class="divider"></div>
-      <button id="btnMirror" class="btn btn-ghost" style="padding:5px 10px;font-size:.75rem;" onclick="toggleMirror()">
-        Espelhar
-      </button>
-    </div>
-
-    <!-- SETUP PANEL -->
-    <div id="setupPanel">
-      <h3>Configurar Live</h3>
-      <div class="form-group">
-        <label>Título da Live</label>
-        <input type="text" id="streamTitle" placeholder="Ex: Gameplay ao vivo, Tutorial..." value="Minha Live" />
-      </div>
-    </div>
-
-    <!-- ROOM CODE -->
-    <div id="roomCodeCard">
-      <div style="font-size:.8rem;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;">Código — Compartilhe com os Espectadores</div>
-      <div class="room-code-row">
-        <div class="room-code" id="roomCodeDisplay">—</div>
-        <button class="btn btn-ghost" style="padding:8px 14px;font-size:.8rem" onclick="copyRoomCode()">Copiar</button>
-      </div>
-      <div style="font-size:.75rem;color:var(--muted);margin-top:8px;">
-        Link: <span id="viewerLink" style="color:var(--accent2)"></span>
-      </div>
-    </div>
-
-    <!-- VIEWER LIST -->
-    <div id="viewerListCard">
-      <h3>Espectadores Online</h3>
-      <div id="viewerList">
-        <div style="color:var(--muted);font-size:.82rem;text-align:center;padding:16px;">Nenhum espectador ainda</div>
-      </div>
-    </div>
-
-    <!-- PARTICIPANTS (viewers with mic/camera on) -->
-    <div id="participantsCard" style="display:none; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px;">
-      <div style="font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Participantes com mic/câmera</div>
-      <div id="participantsList" style="display:flex;gap:10px;flex-wrap:wrap;"></div>
-    </div>
-
-  </div>
-
-  <!-- CHAT -->
-  <div class="right-panel">
-    <div class="chat-header">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-      Chat ao Vivo
-    </div>
-    <div id="pinnedMsg">
-      <div class="pinned-label">📌 FIXADO</div>
-      <div id="pinnedMsgText"></div>
-    </div>
-    <div id="chatMessages"></div>
-    <div class="chat-input-row">
-      <input type="text" id="hostChatInput" placeholder="Mensagem como host..." onkeydown="handleChatKey(event)" />
-      <button class="send-btn" onclick="sendChat()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-      </button>
+      <div class="divider-v"></div>
+      <button id="btnMirror" onclick="toggleMirror()" style="background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 10px;font-size:.72rem;cursor:pointer;">Espelhar</button>
     </div>
   </div>
 </div>
 
-<div class="modal-overlay" id="endModal">
+<!-- REACTIONS BAR -->
+<div class="reactions-bar">
+  <span style="font-size:.7rem;color:var(--muted);margin-right:4px;white-space:nowrap;">Reações:</span>
+  <button class="reaction-btn" onclick="sendReaction('❤️')">❤️</button>
+  <button class="reaction-btn" onclick="sendReaction('👍')">👍</button>
+  <button class="reaction-btn" onclick="sendReaction('🎉')">🎉</button>
+  <button class="reaction-btn" onclick="sendReaction('👏')">👏</button>
+  <button class="reaction-btn" onclick="sendReaction('😄')">😄</button>
+  <button class="reaction-btn" onclick="sendReaction('😮')">😮</button>
+  <button class="reaction-btn" onclick="sendReaction('😢')">😢</button>
+  <button class="reaction-btn" onclick="sendReaction('🔥')">🔥</button>
+  <button class="reaction-btn" onclick="sendReaction('💎')">💎</button>
+  <button class="reaction-btn" onclick="sendReaction('💸')">💸</button>
+  <button class="reaction-btn" onclick="sendReaction('🚀')">🚀</button>
+  <button class="reaction-btn" onclick="sendReaction('👑')">👑</button>
+</div>
+
+<!-- CHAT -->
+<div class="chat-panel">
+  <div class="chat-header">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    Mensagens na chamada
+  </div>
+  <div id="pinnedMsg"><div class="pl">📌 FIXADO</div><div id="pinnedMsgText"></div></div>
+  <div id="chatMessages"></div>
+  <div class="chat-input-row">
+    <input type="text" id="hostChatInput" placeholder="Enviar uma mensagem..." onkeydown="handleChatKey(event)"/>
+    <button class="send-btn" onclick="sendChat()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- BOTTOM CONTROLS -->
+<div class="controls-bar">
+  <button class="ctrl-btn ctrl-ghost" id="btnScreen" onclick="startScreenShare()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+    Tela
+  </button>
+  <button class="ctrl-btn ctrl-ghost" id="btnWebcam" onclick="toggleWebcam()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+    Webcam
+  </button>
+  <button class="ctrl-btn ctrl-ghost" id="btnMic" onclick="toggleMic()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+    Microfone
+  </button>
+  <div class="ctrl-sep"></div>
+  <button class="ctrl-btn ctrl-live" id="btnGoLive" onclick="goLive()" disabled>
+    <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="8"/></svg>
+    Ir ao Vivo
+  </button>
+  <button class="ctrl-btn ctrl-end" id="btnEndLive" onclick="showEndModal()" style="display:none">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+    Encerrar
+  </button>
+</div>
+
+<!-- END MODAL -->
+<div class="modal-bg" id="endModal">
   <div class="modal">
     <h2>Encerrar a Live?</h2>
-    <p>Todos os espectadores serão desconectados e a sala será fechada.</p>
+    <p style="color:var(--muted);font-size:.83rem;margin-bottom:0">Todos os espectadores serão desconectados.</p>
     <div class="modal-btns">
-      <button class="btn btn-ghost" onclick="closeEndModal()">Cancelar</button>
-      <button class="btn btn-danger" onclick="endLive()">Encerrar</button>
+      <button class="ctrl-btn ctrl-ghost" onclick="closeEndModal()">Cancelar</button>
+      <button class="ctrl-btn ctrl-end" onclick="endLive()">Encerrar</button>
     </div>
   </div>
 </div>
 
-<!-- hidden video elements for canvas drawing -->
+<!-- SETUP MODAL -->
+<div class="modal-bg open" id="setupModal">
+  <div class="modal">
+    <h2>Configurar Live</h2>
+    <div class="form-group">
+      <label>Título da Live</label>
+      <input type="text" id="streamTitle" placeholder="Ex: Gameplay ao vivo, Tutorial..." value="Minha Live"/>
+    </div>
+    <div class="modal-btns">
+      <button class="ctrl-btn ctrl-live" onclick="closeSetupModal()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
 <video id="screenVideo" autoplay muted playsinline style="display:none"></video>
 <video id="webcamVideo" autoplay muted playsinline style="display:none"></video>
 
@@ -404,204 +488,137 @@
   const screenVid = document.getElementById('screenVideo');
   const webcamVid = document.getElementById('webcamVideo');
 
-  let roomId = null;
-  let isLive = false;
-  let screenStream = null;
-  let webcamStream = null;
-  let micStream    = null;
-  let outputStream = null; // what viewers receive
-  let audioCtx     = null;
-  let micSource    = null;
-  let micAnalyser  = null;
-  let micMuted     = false;
-  let micGainNode  = null;
-  let webcamOn     = false;
-  let camPos       = 'br'; // tl tr bl br
-  let camSizePct   = 22;   // % of canvas width
-  let mirrorCam    = false;
-  let renderLoopId = null;
-  let peerConnections = {};
-  let viewers = {};
-  let uptimeInterval = null;
-  let liveStartTime  = null;
-
   canvas.width  = 1280;
   canvas.height = 720;
 
-  const ICE_CONFIG = {
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' }
-    ]
-  };
+  let roomId = null, isLive = false;
+  let screenStream = null, webcamStream = null, micStream = null, outputStream = null;
+  let audioCtx = null, micGainNode = null, micAnalyser = null;
+  let micMuted = false, webcamOn = false, camPos = 'br', camSizePct = 22, mirrorCam = false;
+  let renderLoopId = null, peerConnections = {}, viewers = {};
+  let uptimeInterval = null, liveStartTime = null;
 
-  // ── CANVAS RENDER LOOP ────────────────────────────────────────────────────
+  const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
+
+  const TILE_COLORS = ['#6d28d9','#0e7490','#065f46','#92400e','#7c3aed','#1d4ed8','#be185d'];
+  function tileColor(name) { let h=0; for(let c of name) h+=c.charCodeAt(0); return TILE_COLORS[h % TILE_COLORS.length]; }
+
+  // ── SETUP MODAL ────────────────────────────────────────────────────────────
+  function closeSetupModal() {
+    const title = document.getElementById('streamTitle').value.trim() || 'Minha Live';
+    document.getElementById('topStreamName').textContent = title;
+    document.getElementById('setupModal').classList.remove('open');
+  }
+
+  // ── CANVAS RENDER LOOP ─────────────────────────────────────────────────────
   function startRenderLoop() {
     if (renderLoopId) return;
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-
       if (screenStream && screenVid.readyState >= 2) {
         ctx.drawImage(screenVid, 0, 0, canvas.width, canvas.height);
       } else {
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#000'; ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
-
       if (webcamOn && webcamStream && webcamVid.readyState >= 2) {
         const camW = Math.floor(canvas.width * camSizePct / 100);
         const camH = Math.floor(camW * 9 / 16);
-        const pad  = 14;
+        const pad = 14;
         let cx = 0, cy = 0;
-        if (camPos === 'tl') { cx = pad;                   cy = pad; }
-        if (camPos === 'tr') { cx = canvas.width - camW - pad; cy = pad; }
-        if (camPos === 'bl') { cx = pad;                   cy = canvas.height - camH - pad; }
-        if (camPos === 'br') { cx = canvas.width - camW - pad; cy = canvas.height - camH - pad; }
-
-        // shadow
-        ctx.shadowColor = 'rgba(0,0,0,.6)';
-        ctx.shadowBlur  = 12;
-
-        // rounded clip
-        const r = 8;
+        if (camPos==='tl') { cx=pad; cy=pad; }
+        if (camPos==='tr') { cx=canvas.width-camW-pad; cy=pad; }
+        if (camPos==='bl') { cx=pad; cy=canvas.height-camH-pad; }
+        if (camPos==='br') { cx=canvas.width-camW-pad; cy=canvas.height-camH-pad; }
+        ctx.shadowColor='rgba(0,0,0,.6)'; ctx.shadowBlur=12;
+        const r=8;
         ctx.save();
         ctx.beginPath();
-        ctx.moveTo(cx + r, cy);
-        ctx.lineTo(cx + camW - r, cy);
-        ctx.quadraticCurveTo(cx + camW, cy, cx + camW, cy + r);
-        ctx.lineTo(cx + camW, cy + camH - r);
-        ctx.quadraticCurveTo(cx + camW, cy + camH, cx + camW - r, cy + camH);
-        ctx.lineTo(cx + r, cy + camH);
-        ctx.quadraticCurveTo(cx, cy + camH, cx, cy + camH - r);
-        ctx.lineTo(cx, cy + r);
-        ctx.quadraticCurveTo(cx, cy, cx + r, cy);
-        ctx.closePath();
-        ctx.clip();
-
-        if (mirrorCam) {
-          ctx.save();
-          ctx.translate(cx + camW, cy);
-          ctx.scale(-1, 1);
-          ctx.drawImage(webcamVid, 0, 0, camW, camH);
-          ctx.restore();
-        } else {
-          ctx.drawImage(webcamVid, cx, cy, camW, camH);
-        }
-        ctx.restore();
-        ctx.shadowBlur = 0;
-
-        // border
-        ctx.strokeStyle = 'rgba(168,85,247,.7)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.roundRect(cx, cy, camW, camH, r);
-        ctx.stroke();
+        ctx.moveTo(cx+r,cy); ctx.lineTo(cx+camW-r,cy); ctx.quadraticCurveTo(cx+camW,cy,cx+camW,cy+r);
+        ctx.lineTo(cx+camW,cy+camH-r); ctx.quadraticCurveTo(cx+camW,cy+camH,cx+camW-r,cy+camH);
+        ctx.lineTo(cx+r,cy+camH); ctx.quadraticCurveTo(cx,cy+camH,cx,cy+camH-r);
+        ctx.lineTo(cx,cy+r); ctx.quadraticCurveTo(cx,cy,cx+r,cy); ctx.closePath(); ctx.clip();
+        if (mirrorCam) { ctx.save(); ctx.translate(cx+camW,cy); ctx.scale(-1,1); ctx.drawImage(webcamVid,0,0,camW,camH); ctx.restore(); }
+        else { ctx.drawImage(webcamVid,cx,cy,camW,camH); }
+        ctx.restore(); ctx.shadowBlur=0;
+        ctx.strokeStyle='rgba(168,85,247,.7)'; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.roundRect(cx,cy,camW,camH,r); ctx.stroke();
       }
-
       renderLoopId = requestAnimationFrame(draw);
     }
     draw();
   }
 
   function stopRenderLoop() {
-    if (renderLoopId) { cancelAnimationFrame(renderLoopId); renderLoopId = null; }
+    if (renderLoopId) { cancelAnimationFrame(renderLoopId); renderLoopId=null; }
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   }
 
-  // ── AUDIO CONTEXT ─────────────────────────────────────────────────────────
-  function buildAudioPipeline() {
+  // ── AUDIO ──────────────────────────────────────────────────────────────────
+  function buildAudio() {
     if (audioCtx) audioCtx.close();
     audioCtx = new AudioContext();
     const dest = audioCtx.createMediaStreamDestination();
-
-    // screen audio
     if (screenStream) {
       const at = screenStream.getAudioTracks();
-      if (at.length) {
-        audioCtx.createMediaStreamSource(new MediaStream(at)).connect(dest);
-      }
+      if (at.length) audioCtx.createMediaStreamSource(new MediaStream(at)).connect(dest);
     }
-
-    // mic audio
     if (micStream) {
-      micSource  = audioCtx.createMediaStreamSource(micStream);
-      micGainNode = audioCtx.createGain();
-      micGainNode.gain.value = micMuted ? 0 : 1;
-      micAnalyser = audioCtx.createAnalyser();
-      micAnalyser.fftSize = 32;
-      micSource.connect(micGainNode);
-      micGainNode.connect(micAnalyser);
-      micGainNode.connect(dest);
+      micGainNode = audioCtx.createGain(); micGainNode.gain.value = micMuted ? 0 : 1;
+      micAnalyser = audioCtx.createAnalyser(); micAnalyser.fftSize = 32;
+      const src = audioCtx.createMediaStreamSource(micStream);
+      src.connect(micGainNode); micGainNode.connect(micAnalyser); micGainNode.connect(dest);
       startMicMeter();
     }
-
     return dest.stream.getAudioTracks();
   }
 
-  function rebuildOutputStream() {
+  function rebuildOutput() {
     if (!screenStream) return;
-    const canvasTrack = canvas.captureStream(30).getVideoTracks()[0];
-    const audioTracks = buildAudioPipeline();
-    outputStream = new MediaStream([canvasTrack, ...audioTracks]);
-
-    // update existing peer connections
+    const vt = canvas.captureStream(30).getVideoTracks()[0];
+    const at = buildAudio();
+    outputStream = new MediaStream([vt, ...at]);
     for (const [vid, pc] of Object.entries(peerConnections)) {
       const senders = pc.getSenders();
-      const vSender = senders.find(s => s.track && s.track.kind === 'video');
-      const aSenders = senders.filter(s => s.track && s.track.kind === 'audio');
-      if (vSender) vSender.replaceTrack(canvasTrack);
-      audioTracks.forEach((at, i) => { if (aSenders[i]) aSenders[i].replaceTrack(at); });
+      const vs = senders.find(s=>s.track&&s.track.kind==='video');
+      const as = senders.filter(s=>s.track&&s.track.kind==='audio');
+      if (vs) vs.replaceTrack(vt);
+      at.forEach((a,i) => { if(as[i]) as[i].replaceTrack(a); });
     }
   }
 
-  // ── MIC METER ─────────────────────────────────────────────────────────────
   function startMicMeter() {
     if (!micAnalyser) return;
     const data = new Uint8Array(micAnalyser.frequencyBinCount);
-    const bars = [document.getElementById('b1'), document.getElementById('b2'),
-                  document.getElementById('b3'), document.getElementById('b4')];
-    function tick() {
+    const bars = ['b1','b2','b3','b4'].map(id=>document.getElementById(id));
+    (function tick() {
       if (!micAnalyser) return;
       micAnalyser.getByteFrequencyData(data);
-      const avg = data.slice(0,4).reduce((a,b)=>a+b,0) / 4;
-      bars.forEach((b, i) => {
-        b.style.height = Math.max(2, Math.min(14, (data[i]||avg) / 10)) + 'px';
-      });
+      bars.forEach((b,i) => b.style.height = Math.max(2,Math.min(12,(data[i]||0)/10))+'px');
       requestAnimationFrame(tick);
-    }
-    tick();
+    })();
   }
 
-  // ── SCREEN SHARE ─────────────────────────────────────────────────────────
+  // ── SCREEN SHARE ──────────────────────────────────────────────────────────
   async function startScreenShare() {
     try {
-      screenStream = await navigator.mediaDevices.getDisplayMedia({
-        video: { frameRate: 30, cursor: 'always' }, audio: true
-      });
+      screenStream = await navigator.mediaDevices.getDisplayMedia({ video:{frameRate:30,cursor:'always'}, audio:true });
       screenVid.srcObject = screenStream;
-      document.getElementById('previewOverlay').style.display = 'none';
+      document.getElementById('screenOverlay').style.display = 'none';
+      document.getElementById('btnScreen').className = 'ctrl-btn ctrl-active';
+      document.getElementById('btnScreen').innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> Tela ✓`;
       document.getElementById('btnGoLive').disabled = false;
-      document.getElementById('btnShare').className = 'btn btn-active';
-      document.getElementById('btnShare').innerHTML = `
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-        Tela ✓`;
-      screenStream.getVideoTracks()[0].onended = () => stopScreenShare();
-      startRenderLoop();
-      rebuildOutputStream();
-    } catch(e) {
-      alert('Erro ao capturar tela: ' + e.message);
-    }
+      screenStream.getVideoTracks()[0].onended = stopScreenShare;
+      startRenderLoop(); rebuildOutput();
+    } catch(e) { alert('Erro ao capturar tela: '+e.message); }
   }
 
   function stopScreenShare() {
-    if (screenStream) { screenStream.getTracks().forEach(t=>t.stop()); screenStream = null; }
+    if (screenStream) { screenStream.getTracks().forEach(t=>t.stop()); screenStream=null; }
     screenVid.srcObject = null;
-    document.getElementById('previewOverlay').style.display = 'flex';
+    document.getElementById('screenOverlay').style.display = 'flex';
+    document.getElementById('btnScreen').className = 'ctrl-btn ctrl-ghost';
+    document.getElementById('btnScreen').innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> Tela`;
     document.getElementById('btnGoLive').disabled = true;
-    document.getElementById('btnShare').className = 'btn btn-ghost';
-    document.getElementById('btnShare').innerHTML = `
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-      Tela`;
     stopRenderLoop();
   }
 
@@ -609,66 +626,47 @@
   async function toggleWebcam() {
     if (!webcamOn) {
       try {
-        webcamStream = await navigator.mediaDevices.getUserMedia({ video: true });
-        webcamVid.srcObject = webcamStream;
-        webcamOn = true;
-        document.getElementById('btnWebcam').className = 'btn btn-active';
-        document.getElementById('btnWebcam').innerHTML = `
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
-          Webcam ✓`;
-        document.getElementById('webcamOptions').style.display = 'flex';
+        webcamStream = await navigator.mediaDevices.getUserMedia({ video:true });
+        webcamVid.srcObject = webcamStream; webcamOn = true;
+        document.getElementById('btnWebcam').className = 'ctrl-btn ctrl-active';
+        document.getElementById('btnWebcam').innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg> Webcam ✓`;
+        document.getElementById('camOptionsBar').classList.add('show');
         if (!renderLoopId) startRenderLoop();
-      } catch(e) {
-        alert('Não foi possível acessar a webcam: ' + e.message);
-      }
+      } catch(e) { alert('Sem permissão para a webcam.'); }
     } else {
-      if (webcamStream) { webcamStream.getTracks().forEach(t=>t.stop()); webcamStream = null; }
-      webcamVid.srcObject = null;
+      if (webcamStream) { webcamStream.getTracks().forEach(t=>t.stop()); webcamStream=null; }
       webcamOn = false;
-      document.getElementById('btnWebcam').className = 'btn btn-ghost';
-      document.getElementById('btnWebcam').innerHTML = `
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
-        Webcam`;
-      document.getElementById('webcamOptions').style.display = 'none';
+      document.getElementById('btnWebcam').className = 'ctrl-btn ctrl-ghost';
+      document.getElementById('btnWebcam').innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg> Webcam`;
+      document.getElementById('camOptionsBar').classList.remove('show');
     }
   }
 
-  function setCamPos(pos) {
-    camPos = pos;
-    document.querySelectorAll('.cam-pos-btn').forEach((b,i) => {
-      b.classList.toggle('sel', ['tl','tr','bl','br'][i] === pos);
-    });
+  function setCamPos(p) {
+    camPos = p;
+    document.querySelectorAll('.cam-pos-btn').forEach((b,i)=>b.classList.toggle('sel',['tl','tr','bl','br'][i]===p));
   }
-
   function toggleMirror() {
     mirrorCam = !mirrorCam;
-    document.getElementById('btnMirror').className = mirrorCam ? 'btn btn-active' : 'btn btn-ghost';
-    document.getElementById('btnMirror').style.cssText = 'padding:5px 10px;font-size:.75rem;';
+    document.getElementById('btnMirror').style.borderColor = mirrorCam ? 'var(--green)' : 'var(--border)';
   }
 
-  // ── MICROPHONE ────────────────────────────────────────────────────────────
+  // ── MIC ───────────────────────────────────────────────────────────────────
   async function toggleMic() {
     if (!micStream) {
       try {
-        micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        micMuted = false;
-        document.getElementById('btnMic').className = 'btn btn-active';
-        document.getElementById('btnMic').innerHTML = `
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-          Mic ✓`;
+        micStream = await navigator.mediaDevices.getUserMedia({ audio:true }); micMuted=false;
+        document.getElementById('btnMic').className = 'ctrl-btn ctrl-active';
+        document.getElementById('btnMic').innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg> Mic ✓`;
         document.getElementById('micIndicator').className = 'mic-indicator active';
-        document.getElementById('micLabel').textContent = 'MIC';
-        rebuildOutputStream();
-      } catch(e) {
-        alert('Não foi possível acessar o microfone: ' + e.message);
-      }
+        rebuildOutput();
+      } catch(e) { alert('Sem permissão para o microfone.'); }
     } else {
-      // toggle mute
       micMuted = !micMuted;
       if (micGainNode) micGainNode.gain.value = micMuted ? 0 : 1;
-      document.getElementById('btnMic').className = micMuted ? 'btn btn-muted' : 'btn btn-active';
+      document.getElementById('btnMic').className = micMuted ? 'ctrl-btn ctrl-muted' : 'ctrl-btn ctrl-active';
       document.getElementById('btnMic').innerHTML = micMuted
-        ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg> Mudo`
+        ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg> Mudo`
         : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg> Mic ✓`;
       document.getElementById('micIndicator').className = micMuted ? 'mic-indicator muted' : 'mic-indicator active';
       document.getElementById('micLabel').textContent = micMuted ? 'MUDO' : 'MIC';
@@ -677,39 +675,50 @@
 
   // ── GO LIVE ────────────────────────────────────────────────────────────────
   function goLive() {
-    const title = document.getElementById('streamTitle').value.trim() || 'Live Stream';
+    const title = document.getElementById('streamTitle').value.trim() || 'Minha Live';
+    document.getElementById('topStreamName').textContent = title;
     socket.emit('host:create', { title });
   }
 
   socket.on('host:created', ({ roomId: id }) => {
-    roomId = id;
-    isLive = true;
-    document.getElementById('roomCodeDisplay').textContent = id;
-    const link = `${location.origin}/viewer.html?room=${id}`;
-    document.getElementById('viewerLink').textContent = link;
-    document.getElementById('roomCodeCard').style.display = 'block';
-    document.getElementById('setupPanel').style.display = 'none';
+    roomId = id; isLive = true;
+    document.getElementById('livePill').style.display = 'flex';
     document.getElementById('btnGoLive').style.display = 'none';
     document.getElementById('btnEndLive').style.display = 'flex';
-    document.getElementById('statusBadge').classList.add('live');
-    document.getElementById('statusText').textContent = 'AO VIVO';
-    document.getElementById('previewLabel').className = 'preview-label live';
-    document.getElementById('previewLabel').textContent = '● LIVE';
+    document.getElementById('screenLabel').className = 'screen-label live';
+    document.getElementById('screenLabel').textContent = '● LIVE';
+    const bar = document.getElementById('roomCodeBar');
+    bar.textContent = id; bar.style.display = 'block';
     liveStartTime = Date.now();
-    document.getElementById('uptimePill').style.display = 'flex';
+    const up = document.getElementById('uptimePill'); up.style.display='flex';
     uptimeInterval = setInterval(updateUptime, 1000);
   });
 
-  // ── NEW VIEWER ────────────────────────────────────────────────────────────
+  // ── REACTIONS ─────────────────────────────────────────────────────────────
+  function sendReaction(emoji) {
+    if (roomId) socket.emit('chat:reaction', { emoji });
+    spawnReaction(emoji);
+  }
+
+  socket.on('chat:reaction', ({ emoji }) => spawnReaction(emoji));
+
+  function spawnReaction(emoji) {
+    const el = document.createElement('div');
+    el.className = 'reaction-float';
+    el.textContent = emoji;
+    el.style.left = (20 + Math.random() * 60) + '%';
+    el.style.bottom = '80px';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 2000);
+  }
+
+  // ── WEBRTC ────────────────────────────────────────────────────────────────
   socket.on('viewer:new', async ({ viewerId, username, viewerCount }) => {
     viewers[viewerId] = { username };
-    updateViewerCount(viewerCount);
-    renderViewerList();
-    addSystemMsg(`${username} entrou na live`);
+    updateViewerCount(viewerCount); renderTiles(); addSystemMsg(`${username} entrou`);
     if (!outputStream) return;
-
-    const pc = createPeerConnection(viewerId);
-    outputStream.getTracks().forEach(t => pc.addTrack(t, outputStream));
+    const pc = createPC(viewerId);
+    outputStream.getTracks().forEach(t=>pc.addTrack(t,outputStream));
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     socket.emit('webrtc:offer', { targetId: viewerId, offer });
@@ -728,167 +737,29 @@
   socket.on('viewer:left', ({ viewerId, username, viewerCount }) => {
     delete viewers[viewerId];
     if (peerConnections[viewerId]) { peerConnections[viewerId].close(); delete peerConnections[viewerId]; }
-    updateViewerCount(viewerCount);
-    renderViewerList();
-    addSystemMsg(`${username} saiu da live`);
+    updateViewerCount(viewerCount); renderTiles(); addSystemMsg(`${username} saiu`);
   });
 
   socket.on('viewer:count', ({ count }) => updateViewerCount(count));
 
-  function createPeerConnection(viewerId) {
-    const pc = new RTCPeerConnection(ICE_CONFIG);
+  function createPC(viewerId) {
+    const pc = new RTCPeerConnection(ICE);
     peerConnections[viewerId] = pc;
-    pc.onicecandidate = ({ candidate }) => {
-      if (candidate) socket.emit('webrtc:ice', { targetId: viewerId, candidate });
-    };
-    pc.onconnectionstatechange = () => {
-      if (['failed','disconnected','closed'].includes(pc.connectionState)) delete peerConnections[viewerId];
-    };
+    pc.onicecandidate = ({candidate}) => { if(candidate) socket.emit('webrtc:ice',{targetId:viewerId,candidate}); };
+    pc.onconnectionstatechange = () => { if(['failed','disconnected','closed'].includes(pc.connectionState)) delete peerConnections[viewerId]; };
     return pc;
   }
 
-  // ── END LIVE ──────────────────────────────────────────────────────────────
-  function showEndModal() { document.getElementById('endModal').classList.add('open'); }
-  function closeEndModal() { document.getElementById('endModal').classList.remove('open'); }
-
-  function endLive() {
-    socket.emit('host:end');
-    Object.values(peerConnections).forEach(pc => pc.close());
-    peerConnections = {};
-    stopScreenShare();
-    if (webcamStream) { webcamStream.getTracks().forEach(t=>t.stop()); webcamStream = null; webcamOn = false; }
-    if (micStream)    { micStream.getTracks().forEach(t=>t.stop());    micStream = null; }
-    if (audioCtx)     { audioCtx.close(); audioCtx = null; }
-    isLive = false;
-    clearInterval(uptimeInterval);
-    document.getElementById('statusBadge').classList.remove('live');
-    document.getElementById('statusText').textContent = 'Offline';
-    document.getElementById('previewLabel').className = 'preview-label';
-    document.getElementById('previewLabel').textContent = 'PREVIEW';
-    document.getElementById('btnEndLive').style.display = 'none';
-    document.getElementById('btnGoLive').style.display = 'flex';
-    document.getElementById('btnGoLive').disabled = true;
-    document.getElementById('setupPanel').style.display = 'block';
-    document.getElementById('roomCodeCard').style.display = 'none';
-    document.getElementById('uptimePill').style.display = 'none';
-    document.getElementById('webcamOptions').style.display = 'none';
-    document.getElementById('micIndicator').className = 'mic-indicator';
-    viewers = {}; renderViewerList(); closeEndModal(); roomId = null;
-  }
-
-  // ── CHAT ──────────────────────────────────────────────────────────────────
-  function sendChat() {
-    const input = document.getElementById('hostChatInput');
-    const msg = input.value.trim();
-    if (!msg || !roomId) return;
-    socket.emit('chat:message', { message: msg });
-    input.value = '';
-  }
-  function handleChatKey(e) { if (e.key==='Enter') sendChat(); }
-  socket.on('chat:message', appendChatMsg);
-
-  let chatMessages = [];
-  function appendChatMsg(msg) {
-    chatMessages.push(msg);
-    const box = document.getElementById('chatMessages');
-    const el = document.createElement('div');
-    el.className = 'chat-msg' + (msg.isHost ? ' host-msg' : '');
-    el.dataset.id = msg.id;
-    el.innerHTML = `
-      <div class="msg-author ${msg.isHost?'is-host':''}">${esc(msg.username)}</div>
-      <span class="msg-time">${formatTime(msg.timestamp)}</span>
-      ${esc(msg.message)}
-      <div><button class="pin-msg-btn" onclick="pinMsgById(${msg.id},'${esc(msg.message).replace(/'/g,"\\'")}')">📌 Fixar</button></div>`;
-    box.appendChild(el);
-    box.scrollTop = box.scrollHeight;
-  }
-
-  function addSystemMsg(text) {
-    const box = document.getElementById('chatMessages');
-    const el = document.createElement('div');
-    el.style.cssText='text-align:center;font-size:.75rem;color:var(--muted);padding:4px 0;';
-    el.textContent = text;
-    box.appendChild(el);
-    box.scrollTop = box.scrollHeight;
-  }
-
-  function pinMsgById(id, text) {
-    socket.emit('host:pin-message', { msgId: id });
-    document.getElementById('pinnedMsg').style.display = 'block';
-    document.getElementById('pinnedMsgText').textContent = text;
-  }
-
-  socket.on('host:kick', ({ viewerId }) => {
-    socket.emit('host:kick', { viewerId });
-    delete viewers[viewerId];
-    renderViewerList();
-  });
-
-  function kickViewer(viewerId) {
-    socket.emit('host:kick', { viewerId });
-    delete viewers[viewerId];
-    renderViewerList();
-  }
-
-  // ── UI HELPERS ────────────────────────────────────────────────────────────
-  function copyRoomCode() {
-    navigator.clipboard.writeText(roomId);
-    const btn = document.querySelector('#roomCodeCard .btn-ghost');
-    btn.textContent = 'Copiado!';
-    setTimeout(() => btn.textContent = 'Copiar', 1500);
-  }
-
-  function updateViewerCount(n) { document.getElementById('viewerCountTop').textContent = n; }
-
-  function renderViewerList() {
-    const list = document.getElementById('viewerList');
-    const entries = Object.entries(viewers);
-    if (!entries.length) {
-      list.innerHTML = '<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:16px;">Nenhum espectador ainda</div>';
-      return;
-    }
-    list.innerHTML = entries.map(([id,v]) => `
-      <div class="viewer-item">
-        <div class="vname">
-          <div class="viewer-avatar">${v.username.charAt(0).toUpperCase()}</div>
-          <span>${esc(v.username)}</span>
-        </div>
-        <button class="kick-btn" onclick="kickViewer('${id}')">Remover</button>
-      </div>`).join('');
-  }
-
-  function updateUptime() {
-    const s = Math.floor((Date.now() - liveStartTime) / 1000);
-    document.getElementById('uptimeDisplay').textContent =
-      `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
-  }
-
-  function formatTime(ts) {
-    const d = new Date(ts);
-    return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
-  }
-
-  function esc(s) {
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-
-  // ── UPSTREAM: VIEWERS WITH MIC/CAMERA ────────────────────────────────────
-  const upstreamPCs = {}; // viewerId -> RTCPeerConnection
+  // ── UPSTREAM (viewer mic/cam) ──────────────────────────────────────────────
+  const upstreamPCs = {};
+  const participantStreams = {};
 
   socket.on('upstream:offer', async ({ viewerId, username, offer }) => {
-    if (upstreamPCs[viewerId]) { upstreamPCs[viewerId].close(); }
-
-    const upc = new RTCPeerConnection(ICE_CONFIG);
+    if (upstreamPCs[viewerId]) upstreamPCs[viewerId].close();
+    const upc = new RTCPeerConnection(ICE);
     upstreamPCs[viewerId] = upc;
-
-    upc.ontrack = (e) => {
-      addParticipantTile(viewerId, username, e.streams[0], e.track.kind);
-    };
-
-    upc.onicecandidate = ({ candidate }) => {
-      if (candidate) socket.emit('upstream:ice', { targetId: viewerId, candidate });
-    };
-
+    upc.ontrack = (e) => { participantStreams[viewerId] = { stream:e.streams[0], kind:e.track.kind, username }; renderTiles(); };
+    upc.onicecandidate = ({candidate}) => { if(candidate) socket.emit('upstream:ice',{targetId:viewerId,candidate}); };
     await upc.setRemoteDescription(new RTCSessionDescription(offer));
     const answer = await upc.createAnswer();
     await upc.setLocalDescription(answer);
@@ -902,54 +773,149 @@
 
   socket.on('upstream:stop', ({ viewerId }) => {
     if (upstreamPCs[viewerId]) { upstreamPCs[viewerId].close(); delete upstreamPCs[viewerId]; }
-    removeParticipantTile(viewerId);
+    delete participantStreams[viewerId]; renderTiles();
   });
 
-  const participantStreams = {}; // viewerId -> { stream, kind, username }
-
-  function addParticipantTile(viewerId, username, stream, kind) {
-    participantStreams[viewerId] = { stream, kind, username };
-    renderParticipants();
-  }
-
-  function removeParticipantTile(viewerId) {
-    delete participantStreams[viewerId];
-    renderParticipants();
-  }
-
-  function renderParticipants() {
-    const card = document.getElementById('participantsCard');
-    const list = document.getElementById('participantsList');
-    const entries = Object.entries(participantStreams);
-    if (!entries.length) { card.style.display = 'none'; return; }
-    card.style.display = 'block';
-    list.innerHTML = '';
-    entries.forEach(([id, { stream, kind, username: uname }]) => {
-      if (kind === 'video') {
-        const tile = document.createElement('div');
-        tile.className = 'participant-tile';
-        tile.id = 'ptile-' + id;
-        const v = document.createElement('video');
-        v.autoplay = true; v.muted = true; v.playsInline = true;
-        v.srcObject = stream;
-        tile.appendChild(v);
-        const label = document.createElement('div');
-        label.className = 'ptile-name';
-        label.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="10"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>${esc(uname)}`;
-        tile.appendChild(label);
-        list.appendChild(tile);
+  // ── TILES ─────────────────────────────────────────────────────────────────
+  function renderTiles() {
+    const strip = document.getElementById('participantsStrip');
+    const all = Object.entries(viewers);
+    if (!all.length) {
+      strip.innerHTML = '<div style="color:var(--muted);font-size:.78rem;padding:0 4px;">Nenhum espectador online</div>';
+      return;
+    }
+    strip.innerHTML = '';
+    const shown = all.slice(0, 8);
+    shown.forEach(([id, v]) => {
+      const ps = participantStreams[id];
+      const tile = document.createElement('div');
+      tile.className = 'participant-tile' + (ps && ps.kind==='video' ? ' has-video' : '');
+      if (ps && ps.kind === 'video') {
+        const vid = document.createElement('video');
+        vid.autoplay = true; vid.muted = true; vid.playsInline = true;
+        vid.srcObject = ps.stream; vid.style.cssText='width:100%;height:100%;object-fit:cover;display:block;';
+        tile.appendChild(vid);
       } else {
-        const tile = document.createElement('div');
-        tile.className = 'ptile-audio-only';
-        tile.id = 'ptile-' + id;
-        tile.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg><span>${esc(uname)}</span>`;
-        // Play audio
-        const a = document.createElement('audio');
-        a.srcObject = stream; a.autoplay = true;
-        document.body.appendChild(a);
-        list.appendChild(tile);
+        const av = document.createElement('div');
+        av.className = 'tile-avatar';
+        av.style.background = tileColor(v.username);
+        av.textContent = v.username.charAt(0).toUpperCase();
+        tile.appendChild(av);
+        // audio only
+        if (ps && ps.kind === 'audio') {
+          const a = document.createElement('audio');
+          a.srcObject = ps.stream; a.autoplay = true;
+          document.body.appendChild(a);
+        }
       }
+      const name = document.createElement('div');
+      name.className = 'tile-name'; name.textContent = v.username;
+      tile.appendChild(name);
+      const micOff = document.createElement('div');
+      micOff.className = 'tile-mic-off';
+      micOff.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/></svg>`;
+      tile.appendChild(micOff);
+      const kick = document.createElement('button');
+      kick.className = 'tile-kick'; kick.textContent = 'Remover';
+      kick.onclick = (e) => { e.stopPropagation(); kickViewer(id); };
+      tile.appendChild(kick);
+      strip.appendChild(tile);
     });
+    if (all.length > 8) {
+      const more = document.createElement('div');
+      more.className = 'more-tile';
+      more.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>+${all.length - 8} pessoas`;
+      strip.appendChild(more);
+    }
+  }
+
+  function kickViewer(viewerId) {
+    socket.emit('host:kick', { viewerId });
+    delete viewers[viewerId];
+    renderTiles();
+  }
+
+  // ── END LIVE ──────────────────────────────────────────────────────────────
+  function showEndModal() { document.getElementById('endModal').classList.add('open'); }
+  function closeEndModal() { document.getElementById('endModal').classList.remove('open'); }
+
+  function endLive() {
+    socket.emit('host:end');
+    Object.values(peerConnections).forEach(pc=>pc.close()); peerConnections={};
+    stopScreenShare();
+    if (webcamStream) { webcamStream.getTracks().forEach(t=>t.stop()); webcamStream=null; webcamOn=false; }
+    if (micStream)    { micStream.getTracks().forEach(t=>t.stop()); micStream=null; }
+    if (audioCtx)     { audioCtx.close(); audioCtx=null; }
+    isLive=false; clearInterval(uptimeInterval);
+    document.getElementById('livePill').style.display='none';
+    document.getElementById('screenLabel').className='screen-label';
+    document.getElementById('screenLabel').textContent='PREVIEW';
+    document.getElementById('btnEndLive').style.display='none';
+    document.getElementById('btnGoLive').style.display='flex';
+    document.getElementById('btnGoLive').disabled=true;
+    document.getElementById('roomCodeBar').style.display='none';
+    document.getElementById('uptimePill').style.display='none';
+    viewers={}; renderTiles(); closeEndModal(); roomId=null;
+  }
+
+  // ── CHAT ──────────────────────────────────────────────────────────────────
+  function sendChat() {
+    const input = document.getElementById('hostChatInput');
+    const msg = input.value.trim();
+    if (!msg || !roomId) return;
+    socket.emit('chat:message', { message: msg }); input.value='';
+  }
+  function handleChatKey(e) { if(e.key==='Enter') sendChat(); }
+  socket.on('chat:message', appendChatMsg);
+
+  let chatMsgs = [];
+  function appendChatMsg(msg) {
+    chatMsgs.push(msg);
+    const box = document.getElementById('chatMessages');
+    const el = document.createElement('div');
+    el.className = 'chat-msg' + (msg.isHost?' host-msg':'');
+    el.dataset.id = msg.id;
+    el.innerHTML = `<div class="msg-author ${msg.isHost?'is-host':''}">${esc(msg.username)}</div><span class="msg-time">${formatTime(msg.timestamp)}</span>${esc(msg.message)}<div><button class="pin-msg-btn" onclick="pinMsg(${msg.id},'${esc(msg.message).replace(/'/g,"\\'")}')">📌</button></div>`;
+    box.appendChild(el); box.scrollTop=box.scrollHeight;
+  }
+
+  function addSystemMsg(text) {
+    const box = document.getElementById('chatMessages');
+    const el = document.createElement('div');
+    el.style.cssText='text-align:center;font-size:.72rem;color:var(--muted);padding:3px 0;';
+    el.textContent=text; box.appendChild(el); box.scrollTop=box.scrollHeight;
+  }
+
+  function pinMsg(id, text) {
+    socket.emit('host:pin-message', { msgId: id });
+    document.getElementById('pinnedMsg').style.display='block';
+    document.getElementById('pinnedMsgText').textContent=text;
+  }
+
+  // ── HELPERS ───────────────────────────────────────────────────────────────
+  function copyRoomCode() {
+    if (!roomId) return;
+    navigator.clipboard.writeText(roomId);
+    const bar = document.getElementById('roomCodeBar');
+    const prev = bar.textContent; bar.textContent='Copiado!';
+    setTimeout(()=>bar.textContent=prev, 1500);
+  }
+
+  function updateViewerCount(n) { document.getElementById('viewerCountTop').textContent=n; }
+
+  function updateUptime() {
+    const s = Math.floor((Date.now()-liveStartTime)/1000);
+    document.getElementById('uptimeDisplay').textContent =
+      `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
+  }
+
+  function formatTime(ts) {
+    const d=new Date(ts);
+    return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 </script>
 </body>

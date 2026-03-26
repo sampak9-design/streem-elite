@@ -811,8 +811,15 @@
   // ── FULLSCREEN ────────────────────────────────────────────────────────────
   function toggleFullscreen() {
     const el = document.querySelector('.video-area');
-    if (!document.fullscreenElement) el.requestFullscreen();
-    else document.exitFullscreen();
+    if (!document.fullscreenElement) {
+      el.requestFullscreen().then(() => {
+        try { screen.orientation.lock('landscape').catch(()=>{}); } catch(e) {}
+      }).catch(()=>{});
+    } else {
+      document.exitFullscreen().then(() => {
+        try { screen.orientation.unlock(); } catch(e) {}
+      }).catch(()=>{});
+    }
   }
 
   // ── HELPERS ───────────────────────────────────────────────────────────────

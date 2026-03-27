@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Streem Elite — Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    :root {
+      --bg:      #070710;
+      --surface: #0d0d1a;
+      --card:    #13131f;
+      --card2:   #1a1a2e;
+      --border:  rgba(255,255,255,.07);
+      --border2: rgba(255,255,255,.12);
+      --accent:  #7c3aed;
+      --accent2: #a78bfa;
+      --green:   #10b981;
+      --red:     #f43f5e;
+      --yellow:  #f59e0b;
+      --text:    #f1f5f9;
+      --muted:   #64748b;
+      --muted2:  #94a3b8;
+      --glow:    rgba(124,58,237,.3);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── LOGIN ── */
+    #loginScreen {
+      min-height: 100vh; display: flex;
+      align-items: center; justify-content: center; padding: 20px;
+    }
+    .login-card {
+      background: var(--card2); border: 1px solid var(--border2);
+      border-radius: 20px; padding: 40px 36px; width: 380px; max-width: 100%;
+      box-shadow: 0 24px 60px rgba(0,0,0,.5);
+    }
+    .login-icon {
+      width: 52px; height: 52px; border-radius: 14px; margin-bottom: 20px;
+      background: linear-gradient(135deg, var(--accent), #4f46e5);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 8px 24px var(--glow);
+    }
+    .login-icon svg { width: 24px; height: 24px; color: #fff; }
+    .login-card h1 { font-size: 1.2rem; font-weight: 800; margin-bottom: 4px; }
+    .login-card p  { font-size: .82rem; color: var(--muted2); margin-bottom: 24px; }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: .72rem; font-weight: 600; color: var(--muted2); margin-bottom: 6px; letter-spacing: .3px; }
+    .field input {
+      width: 100%; background: var(--surface); border: 1px solid var(--border2);
+      border-radius: 8px; padding: 10px 14px; color: var(--text);
+      font-size: .88rem; outline: none; font-family: inherit;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,58,237,.18); }
+    .btn-primary {
+      width: 100%; padding: 11px; border: none; border-radius: 8px; cursor: pointer;
+      font-size: .88rem; font-weight: 700; font-family: inherit;
+      background: linear-gradient(135deg, var(--accent), #4f46e5);
+      color: #fff; box-shadow: 0 4px 16px var(--glow);
+      transition: opacity .2s, transform .15s; margin-top: 4px;
+    }
+    .btn-primary:hover { opacity: .9; transform: translateY(-1px); }
+    .login-error { color: var(--red); font-size: .8rem; margin-top: 10px; display: none; }
+
+    /* ── DASHBOARD ── */
+    #dashboard { display: none; }
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 24px; height: 58px;
+      background: rgba(13,13,26,.97); border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 10; backdrop-filter: blur(16px);
+    }
+    .logo {
+      display: flex; align-items: center; gap: 8px;
+      font-size: .9rem; font-weight: 800; letter-spacing: 1.5px;
+      background: linear-gradient(135deg, var(--accent2), #c4b5fd);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .logo-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--red);
+      box-shadow: 0 0 8px var(--red); animation: pulse 1.2s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .room-badge {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--card2); border: 1px solid var(--border2);
+      border-radius: 20px; padding: 5px 14px; font-size: .8rem;
+    }
+    .room-badge span { color: var(--accent2); font-weight: 700; letter-spacing: 1px; }
+    .logout-btn {
+      background: none; border: 1px solid var(--border2); border-radius: 8px;
+      color: var(--muted2); padding: 6px 14px; cursor: pointer; font-size: .78rem;
+      font-family: inherit; transition: border-color .2s, color .2s;
+    }
+    .logout-btn:hover { border-color: var(--red); color: var(--red); }
+
+    .page { max-width: 1100px; margin: 0 auto; padding: 28px 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 700px) { .page { grid-template-columns: 1fr; padding: 16px; } }
+
+    /* ── CARDS ── */
+    .card {
+      background: var(--card2); border: 1px solid var(--border);
+      border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 14px;
+    }
+    .card.full { grid-column: 1 / -1; }
+    .card-title {
+      display: flex; align-items: center; gap: 8px;
+      font-size: .78rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .7px; color: var(--muted2);
+    }
+    .card-title svg { width: 15px; height: 15px; }
+    .card-title .badge {
+      margin-left: auto; background: var(--card); border: 1px solid var(--border2);
+      border-radius: 20px; padding: 2px 10px; font-size: .7rem; color: var(--accent2); font-weight: 600;
+    }
+
+    /* stats row */
+    .stats-row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .stat-box {
+      flex: 1; min-width: 80px; background: var(--card); border: 1px solid var(--border2);
+      border-radius: 10px; padding: 12px 14px;
+    }
+    .stat-box .sv { font-size: 1.6rem; font-weight: 800; color: var(--accent2); }
+    .stat-box .sl { font-size: .68rem; color: var(--muted); margin-top: 2px; font-weight: 500; text-transform: uppercase; letter-spacing: .5px; }
+
+    /* inputs */
+    .row { display: flex; gap: 8px; }
+    input.inp {
+      flex: 1; background: var(--surface); border: 1px solid var(--border2);
+      border-radius: 8px; padding: 9px 12px; color: var(--text);
+      font-size: .84rem; outline: none; font-family: inherit;
+      transition: border-color .2s;
+    }
+    input.inp:focus { border-color: var(--accent); }
+    input.inp::placeholder { color: var(--muted); }
+    input.inp[type=number] { max-width: 100px; }
+    .btn {
+      padding: 9px 16px; border: none; border-radius: 8px; cursor: pointer;
+      font-size: .8rem; font-weight: 600; font-family: inherit; transition: opacity .2s;
+      white-space: nowrap;
+    }
+    .btn:hover { opacity: .85; }
+    .btn-accent { background: linear-gradient(135deg, var(--accent), #4f46e5); color: #fff; }
+    .btn-green  { background: rgba(16,185,129,.15); color: var(--green); border: 1px solid rgba(16,185,129,.3); }
+    .btn-red    { background: rgba(244,63,94,.15);  color: var(--red);   border: 1px solid rgba(244,63,94,.3); }
+
+    /* word list */
+    .word-list { display: flex; flex-wrap: wrap; gap: 6px; min-height: 36px; }
+    .word-chip {
+      display: flex; align-items: center; gap: 5px;
+      background: rgba(244,63,94,.1); border: 1px solid rgba(244,63,94,.3);
+      border-radius: 20px; padding: 3px 10px; font-size: .75rem; color: var(--red);
+    }
+    .word-chip button {
+      background: none; border: none; color: var(--red); cursor: pointer;
+      font-size: .85rem; line-height: 1; padding: 0; opacity: .7;
+    }
+    .word-chip button:hover { opacity: 1; }
+
+    /* chat log */
+    .chat-log {
+      max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;
+      scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.06) transparent;
+    }
+    .chat-log::-webkit-scrollbar { width: 4px; }
+    .chat-log::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 4px; }
+    .chat-entry {
+      background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+      padding: 7px 10px; font-size: .78rem; line-height: 1.4;
+    }
+    .chat-entry .ce-name { font-weight: 700; color: var(--accent2); margin-right: 6px; }
+    .chat-entry .ce-time { float: right; font-size: .65rem; color: var(--muted); }
+    .chat-entry.blocked { opacity: .4; border-color: rgba(244,63,94,.3); }
+
+    /* toast */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px; z-index: 999;
+      background: var(--card2); border: 1px solid var(--border2);
+      border-radius: 10px; padding: 10px 18px;
+      font-size: .82rem; font-weight: 600; color: var(--text);
+      box-shadow: 0 8px 24px rgba(0,0,0,.4);
+      animation: toastIn .2s ease; display: none;
+    }
+    .toast.green { border-color: rgba(16,185,129,.4); color: var(--green); }
+    .toast.red   { border-color: rgba(244,63,94,.4);  color: var(--red); }
+    @keyframes toastIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.07); border-radius: 4px; }
+  </style>
+</head>
+<body>
+
+<!-- ── LOGIN ── -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h1>Painel Admin</h1>
+    <p>Acesso restrito — insira as credenciais para continuar.</p>
+    <div class="field">
+      <label>Código da Sala</label>
+      <input type="text" id="loginRoom" placeholder="Ex: A1B2C3D4" oninput="this.value=this.value.toUpperCase()" onkeydown="loginKey(event)"/>
+    </div>
+    <div class="field">
+      <label>Senha Admin</label>
+      <input type="password" id="loginPass" placeholder="••••••••" onkeydown="loginKey(event)"/>
+    </div>
+    <button class="btn-primary" onclick="adminLogin()">Entrar no Painel</button>
+    <div class="login-error" id="loginError">Sala não encontrada ou senha incorreta.</div>
+  </div>
+</div>
+
+<!-- ── DASHBOARD ── -->
+<div id="dashboard">
+  <div class="topbar">
+    <div class="logo">
+      <div class="logo-dot"></div>
+      ADMIN
+    </div>
+    <div class="room-badge">
+      Sala: <span id="topRoomId">—</span>
+    </div>
+    <button class="logout-btn" onclick="logout()">Sair</button>
+  </div>
+
+  <div class="page">
+
+    <!-- STATS -->
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Estatísticas da Sala
+      </div>
+      <div class="stats-row">
+        <div class="stat-box"><div class="sv" id="statReal">0</div><div class="sl">Reais</div></div>
+        <div class="stat-box"><div class="sv" id="statFake">0</div><div class="sl">Falsos</div></div>
+        <div class="stat-box"><div class="sv" id="statTotal">0</div><div class="sl">Total</div></div>
+      </div>
+      <div style="font-size:.72rem;color:var(--muted2);">Título: <b id="statTitle" style="color:var(--text)">—</b></div>
+    </div>
+
+    <!-- ESPECTADORES FALSOS -->
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/><line x1="12" y1="14" x2="12" y2="20"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+        Espectadores Falsos
+      </div>
+      <p style="font-size:.78rem;color:var(--muted2);">Define quantos espectadores extras aparecem no contador para todos.</p>
+      <div class="row">
+        <input class="inp" type="number" id="fakeCount" placeholder="0" min="0" max="999999" value="0"/>
+        <button class="btn btn-accent" onclick="setFakeViewers()">Aplicar</button>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn btn-green" onclick="addFake(100)">+100</button>
+        <button class="btn btn-green" onclick="addFake(500)">+500</button>
+        <button class="btn btn-green" onclick="addFake(1000)">+1k</button>
+        <button class="btn btn-red"   onclick="setFakeViewers(0)">Zerar</button>
+      </div>
+    </div>
+
+    <!-- COMENTÁRIO FALSO -->
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Enviar Comentário
+      </div>
+      <p style="font-size:.78rem;color:var(--muted2);">Envia uma mensagem no chat como qualquer usuário.</p>
+      <input class="inp" id="fakeUser" placeholder="Nome do usuário" style="margin-bottom:6px"/>
+      <div class="row">
+        <input class="inp" id="fakeMsg" placeholder="Mensagem..." onkeydown="if(event.key==='Enter')sendFakeMsg()"/>
+        <button class="btn btn-accent" onclick="sendFakeMsg()">Enviar</button>
+      </div>
+      <!-- Quick names -->
+      <div style="display:flex;gap:5px;flex-wrap:wrap;">
+        <span style="font-size:.65rem;color:var(--muted);align-self:center;">Atalhos:</span>
+        <button class="btn btn-green" onclick="quickMsg('🔥 incrível!!!')">🔥 incrível</button>
+        <button class="btn btn-green" onclick="quickMsg('👍 muito bom!')">👍 ótimo</button>
+        <button class="btn btn-green" onclick="quickMsg('❤️ adorei o conteúdo')">❤️ adorei</button>
+        <button class="btn btn-green" onclick="quickMsg('🚀 melhor live!')">🚀 top</button>
+      </div>
+    </div>
+
+    <!-- PALAVRAS BLOQUEADAS -->
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+        Palavras Bloqueadas
+        <span class="badge" id="wordCount">0</span>
+      </div>
+      <p style="font-size:.78rem;color:var(--muted2);">Mensagens com essas palavras são bloqueadas silenciosamente.</p>
+      <div class="row">
+        <input class="inp" id="newWord" placeholder="Palavra ou frase..." onkeydown="if(event.key==='Enter')addWord()"/>
+        <button class="btn btn-accent" onclick="addWord()">Adicionar</button>
+      </div>
+      <div class="word-list" id="wordList">
+        <span style="font-size:.74rem;color:var(--muted);">Nenhuma palavra bloqueada.</span>
+      </div>
+    </div>
+
+    <!-- CHAT LOG -->
+    <div class="card full">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Chat ao Vivo
+        <button class="btn btn-green" style="margin-left:auto;padding:4px 12px;font-size:.72rem;" onclick="refreshRoom()">↻ Atualizar</button>
+      </div>
+      <div class="chat-log" id="chatLog">
+        <span style="font-size:.74rem;color:var(--muted);">Conectando...</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const socket = io();
+  let pass = '', roomId = '';
+
+  // ── LOGIN ──────────────────────────────────────────────────────────────────
+  function loginKey(e) { if (e.key === 'Enter') adminLogin(); }
+
+  function adminLogin() {
+    const r = document.getElementById('loginRoom').value.trim().toUpperCase();
+    const p = document.getElementById('loginPass').value;
+    if (!r || !p) return;
+    roomId = r; pass = p;
+    socket.emit('admin:get-room', { pass, roomId });
+  }
+
+  socket.on('admin:error', (msg) => {
+    document.getElementById('loginError').style.display = 'block';
+    document.getElementById('loginError').textContent = msg;
+    showToast(msg, 'red');
+  });
+
+  socket.on('admin:room-info', (info) => {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    document.getElementById('loginError').style.display = 'none';
+    document.getElementById('topRoomId').textContent = roomId;
+    updateStats(info);
+    renderWords(info.bannedWords);
+    renderChat(info.recentChat);
+    document.getElementById('fakeCount').value = info.fakeViewers;
+  });
+
+  function logout() {
+    pass = ''; roomId = '';
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('dashboard').style.display = 'none';
+  }
+
+  function refreshRoom() {
+    socket.emit('admin:get-room', { pass, roomId });
+  }
+
+  // ── STATS ─────────────────────────────────────────────────────────────────
+  function updateStats(info) {
+    document.getElementById('statReal').textContent  = info.viewers;
+    document.getElementById('statFake').textContent  = info.fakeViewers;
+    document.getElementById('statTotal').textContent = info.viewers + info.fakeViewers;
+    document.getElementById('statTitle').textContent = info.title;
+  }
+
+  // ── LIVE EVENTS ───────────────────────────────────────────────────────────
+  socket.on('chat:message', (msg) => {
+    if (!roomId) return;
+    appendChatEntry(msg);
+  });
+
+  socket.on('viewer:count', ({ count }) => {
+    // just refresh
+  });
+
+  // ── FAKE VIEWERS ──────────────────────────────────────────────────────────
+  function setFakeViewers(val) {
+    const n = val !== undefined ? val : parseInt(document.getElementById('fakeCount').value) || 0;
+    document.getElementById('fakeCount').value = n;
+    socket.emit('admin:fake-viewers', { pass, roomId, count: n });
+  }
+
+  function addFake(n) {
+    const cur = parseInt(document.getElementById('fakeCount').value) || 0;
+    const next = cur + n;
+    document.getElementById('fakeCount').value = next;
+    socket.emit('admin:fake-viewers', { pass, roomId, count: next });
+  }
+
+  socket.on('admin:ok', (msg) => {
+    showToast(msg, 'green');
+    refreshRoom();
+  });
+
+  // ── FAKE MESSAGE ──────────────────────────────────────────────────────────
+  function sendFakeMsg() {
+    const username = document.getElementById('fakeUser').value.trim() || 'Espectador';
+    const message  = document.getElementById('fakeMsg').value.trim();
+    if (!message) return;
+    socket.emit('admin:fake-message', { pass, roomId, username, message });
+    document.getElementById('fakeMsg').value = '';
+  }
+
+  function quickMsg(msg) {
+    document.getElementById('fakeMsg').value = msg;
+    sendFakeMsg();
+  }
+
+  // ── WORDS ─────────────────────────────────────────────────────────────────
+  function addWord() {
+    const word = document.getElementById('newWord').value.trim();
+    if (!word) return;
+    socket.emit('admin:add-word', { pass, roomId, word });
+    document.getElementById('newWord').value = '';
+  }
+
+  function removeWord(word) {
+    socket.emit('admin:remove-word', { pass, roomId, word });
+  }
+
+  socket.on('admin:words', (words) => renderWords(words));
+
+  function renderWords(words) {
+    const list = document.getElementById('wordList');
+    document.getElementById('wordCount').textContent = words.length;
+    if (!words.length) {
+      list.innerHTML = '<span style="font-size:.74rem;color:var(--muted);">Nenhuma palavra bloqueada.</span>';
+      return;
+    }
+    list.innerHTML = '';
+    words.forEach(w => {
+      const chip = document.createElement('div');
+      chip.className = 'word-chip';
+      chip.innerHTML = `<span>${esc(w)}</span><button onclick="removeWord('${esc(w)}')" title="Remover">✕</button>`;
+      list.appendChild(chip);
+    });
+  }
+
+  // ── CHAT LOG ──────────────────────────────────────────────────────────────
+  function renderChat(msgs) {
+    const log = document.getElementById('chatLog');
+    log.innerHTML = '';
+    if (!msgs.length) {
+      log.innerHTML = '<span style="font-size:.74rem;color:var(--muted);">Sem mensagens ainda.</span>';
+      return;
+    }
+    msgs.forEach(m => appendChatEntry(m, false));
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function appendChatEntry(msg, scroll = true) {
+    const log = document.getElementById('chatLog');
+    // remove placeholder
+    const placeholder = log.querySelector('span');
+    if (placeholder) placeholder.remove();
+    const el = document.createElement('div');
+    el.className = 'chat-entry';
+    const t = new Date(msg.timestamp);
+    const time = `${t.getHours().toString().padStart(2,'0')}:${t.getMinutes().toString().padStart(2,'0')}`;
+    el.innerHTML = `<span class="ce-time">${time}</span><span class="ce-name">${esc(msg.username)}${msg.isHost?' <sup style="color:var(--accent2);font-size:.6rem;">HOST</sup>':''}</span>${esc(msg.message)}`;
+    log.appendChild(el);
+    if (scroll) log.scrollTop = log.scrollHeight;
+  }
+
+  // ── HELPERS ───────────────────────────────────────────────────────────────
+  let toastTimer;
+  function showToast(msg, type = '') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast' + (type ? ' ' + type : '');
+    t.style.display = 'block';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.style.display = 'none', 3000);
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // join the room as observer to receive live chat
+  socket.on('connect', () => {
+    if (roomId && pass) socket.emit('admin:get-room', { pass, roomId });
+  });
+</script>
+</body>
+</html>

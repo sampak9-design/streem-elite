@@ -13,8 +13,9 @@ const io = new Server(server, {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// rooms: Map<roomId, { hostId, title, viewers: Map<socketId, {username}>, chat: [], startTime }>
+// rooms: Map<roomId, { hostId, title, viewers: Map<socketId, {username}>, chat: [], startTime, fakeViewers, bannedWords }>
 const rooms = new Map();
+const ADMIN_PASS = process.env.ADMIN_PASS || 'admin123';
 
 function getRoomStats(room) {
   return {
@@ -35,7 +36,9 @@ io.on('connection', (socket) => {
       title: title || 'Live Stream',
       viewers: new Map(),
       chat: [],
-      startTime: Date.now()
+      startTime: Date.now(),
+      fakeViewers: 0,
+      bannedWords: []
     });
     socket.join(roomId);
     socket.roomId = roomId;
@@ -84,7 +87,7 @@ io.on('connection', (socket) => {
     });
 
     // Broadcast updated count to everyone in room
-    io.to(roomId).emit('viewer:count', { count: room.viewers.size });
+    io.to(roomId).emit('viewer:count', { count: room.viewers.size + room.fakeViewers });
     console.log(`[viewer:join] ${name} → room ${roomId} (total: ${room.viewers.size})`);
   });
 
@@ -137,6 +140,8 @@ io.on('connection', (socket) => {
       const viewer = room.viewers.get(socket.id);
       if (viewer && viewer.chatBanned) return;
     }
+    const lower = message.trim().toLowerCase();
+    if (room.bannedWords.some(w => lower.includes(w.toLowerCase()))) return;
 
     const msg = {
       id: Date.now(),
@@ -201,6 +206,65 @@ io.on('connection', (socket) => {
     io.to(viewerId).emit('host:chat-unbanned');
   });
 
+  // ─── ADMIN ─────────────────────────────────────────────────────────────────
+
+  function adminAuth(pass, roomId) {
+    if (pass !== ADMIN_PASS) return null;
+    return rooms.get(roomId) || null;
+  }
+
+  socket.on('admin:fake-viewers', ({ pass, roomId, count }) => {
+    const room = adminAuth(pass, roomId);
+    if (!room) return socket.emit('admin:error', 'Senha ou sala inválida.');
+    room.fakeViewers = Math.max(0, parseInt(count) || 0);
+    io.to(roomId).emit('viewer:count', { count: room.viewers.size + room.fakeViewers });
+    socket.emit('admin:ok', `Espectadores falsos: ${room.fakeViewers}`);
+  });
+
+  socket.on('admin:fake-message', ({ pass, roomId, username, message }) => {
+    const room = adminAuth(pass, roomId);
+    if (!room) return socket.emit('admin:error', 'Senha ou sala inválida.');
+    if (!message.trim()) return;
+    const msg = {
+      id: Date.now(),
+      username: username || 'Espectador',
+      message: message.trim().slice(0, 300),
+      timestamp: Date.now(),
+      isHost: false
+    };
+    room.chat.push(msg);
+    if (room.chat.length > 500) room.chat.shift();
+    io.to(roomId).emit('chat:message', msg);
+    socket.emit('admin:ok', 'Mensagem enviada.');
+  });
+
+  socket.on('admin:add-word', ({ pass, roomId, word }) => {
+    const room = adminAuth(pass, roomId);
+    if (!room) return socket.emit('admin:error', 'Senha ou sala inválida.');
+    const w = word.trim().toLowerCase();
+    if (w && !room.bannedWords.includes(w)) room.bannedWords.push(w);
+    socket.emit('admin:words', room.bannedWords);
+  });
+
+  socket.on('admin:remove-word', ({ pass, roomId, word }) => {
+    const room = adminAuth(pass, roomId);
+    if (!room) return socket.emit('admin:error', 'Senha ou sala inválida.');
+    room.bannedWords = room.bannedWords.filter(w => w !== word.toLowerCase());
+    socket.emit('admin:words', room.bannedWords);
+  });
+
+  socket.on('admin:get-room', ({ pass, roomId }) => {
+    const room = adminAuth(pass, roomId);
+    if (!room) return socket.emit('admin:error', 'Senha ou sala inválida.');
+    socket.emit('admin:room-info', {
+      title: room.title,
+      viewers: room.viewers.size,
+      fakeViewers: room.fakeViewers,
+      bannedWords: room.bannedWords,
+      recentChat: room.chat.slice(-30)
+    });
+  });
+
   socket.on('chat:reaction', ({ emoji }) => {
     const room = rooms.get(socket.roomId);
     if (!room) return;
@@ -226,7 +290,7 @@ io.on('connection', (socket) => {
       rooms.delete(roomId);
     } else if (socket.isViewer) {
       room.viewers.delete(socket.id);
-      io.to(roomId).emit('viewer:count', { count: room.viewers.size });
+      io.to(roomId).emit('viewer:count', { count: room.viewers.size + room.fakeViewers });
       io.to(room.hostId).emit('viewer:left', {
         viewerId: socket.id,
         username: socket.username,

@@ -118,6 +118,15 @@
     }
     .participant-tile:hover { border-color: rgba(124,58,237,.5); transform: translateY(-1px); }
     .participant-tile.has-video { background: #000; }
+    .participant-tile.speaking {
+      border-color: var(--green) !important;
+      box-shadow: 0 0 0 2px rgba(16,185,129,.4), 0 0 16px rgba(16,185,129,.25);
+    }
+    @keyframes speakPulse {
+      0%,100% { box-shadow: 0 0 0 2px rgba(16,185,129,.4), 0 0 16px rgba(16,185,129,.25); }
+      50%      { box-shadow: 0 0 0 3px rgba(16,185,129,.7), 0 0 24px rgba(16,185,129,.4); }
+    }
+    .participant-tile.speaking { animation: speakPulse .7s ease-in-out infinite; }
     .participant-tile video { width: 100%; height: 100%; object-fit: cover; display: block; }
     .tile-avatar {
       width: 48px; height: 48px; border-radius: 50%;
@@ -995,6 +1004,7 @@
   socket.on('viewer:left', ({ viewerId, username, viewerCount }) => {
     delete viewers[viewerId];
     if (peerConnections[viewerId]) { peerConnections[viewerId].close(); delete peerConnections[viewerId]; }
+    stopAudioMonitor(viewerId);
     updateViewerCount(viewerCount); renderTiles(); addSystemMsg(`${username} saiu`);
   });
 
@@ -1011,12 +1021,53 @@
   // ── UPSTREAM (viewer mic/cam) ──────────────────────────────────────────────
   const upstreamPCs = {};
   const participantStreams = {};
+  const audioMonitors = {}; // { viewerId: { ctx, analyser, raf } }
+
+  function startAudioMonitor(viewerId, stream) {
+    stopAudioMonitor(viewerId);
+    const audioTracks = stream.getAudioTracks();
+    if (!audioTracks.length) return;
+    try {
+      const ctx = new AudioContext();
+      const src = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 512;
+      src.connect(analyser);
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      let speaking = false;
+      function tick() {
+        analyser.getByteFrequencyData(data);
+        const avg = data.reduce((a, b) => a + b, 0) / data.length;
+        const isSpeaking = avg > 8;
+        if (isSpeaking !== speaking) {
+          speaking = isSpeaking;
+          const tile = document.querySelector(`.participant-tile[data-id="${viewerId}"]`);
+          if (tile) tile.classList.toggle('speaking', speaking);
+        }
+        audioMonitors[viewerId].raf = requestAnimationFrame(tick);
+      }
+      audioMonitors[viewerId] = { ctx, analyser, raf: null };
+      tick();
+    } catch(e) {}
+  }
+
+  function stopAudioMonitor(viewerId) {
+    const m = audioMonitors[viewerId];
+    if (!m) return;
+    if (m.raf) cancelAnimationFrame(m.raf);
+    try { m.ctx.close(); } catch(e) {}
+    delete audioMonitors[viewerId];
+  }
 
   socket.on('upstream:offer', async ({ viewerId, username, offer }) => {
     if (upstreamPCs[viewerId]) upstreamPCs[viewerId].close();
     const upc = new RTCPeerConnection(ICE);
     upstreamPCs[viewerId] = upc;
-    upc.ontrack = (e) => { participantStreams[viewerId] = { stream:e.streams[0], kind:e.track.kind, username }; renderTiles(); };
+    upc.ontrack = (e) => {
+      participantStreams[viewerId] = { stream:e.streams[0], kind:e.track.kind, username };
+      renderTiles();
+      if (e.track.kind === 'audio') startAudioMonitor(viewerId, e.streams[0]);
+    };
     upc.onicecandidate = ({candidate}) => { if(candidate) socket.emit('upstream:ice',{targetId:viewerId,candidate}); };
     await upc.setRemoteDescription(new RTCSessionDescription(offer));
     const answer = await upc.createAnswer();
@@ -1031,6 +1082,7 @@
 
   socket.on('upstream:stop', ({ viewerId }) => {
     if (upstreamPCs[viewerId]) { upstreamPCs[viewerId].close(); delete upstreamPCs[viewerId]; }
+    stopAudioMonitor(viewerId);
     delete participantStreams[viewerId]; renderTiles();
   });
 
@@ -1048,6 +1100,7 @@
       const ps = participantStreams[id];
       const tile = document.createElement('div');
       tile.className = 'participant-tile' + (ps && ps.kind==='video' ? ' has-video' : '');
+      tile.dataset.id = id;
       if (ps && ps.kind === 'video') {
         const vid = document.createElement('video');
         vid.autoplay = true; vid.muted = true; vid.playsInline = true;

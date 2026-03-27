@@ -236,7 +236,7 @@
 
     /* ── POLL CARD ── */
     #pollCard {
-      display: none; position: absolute; bottom: 14px; left: 14px;
+      display: none; position: fixed; bottom: 100px; left: 14px;
       width: min(290px, calc(100% - 28px));
       background: rgba(10,10,15,.95); backdrop-filter: blur(16px);
       border: 1px solid rgba(124,58,237,.45); border-radius: 16px;
@@ -418,16 +418,6 @@
         <small>O vídeo vai flutuar quando você minimizar</small>
       </div>
 
-      <!-- POLL CARD -->
-      <div id="pollCard">
-        <div class="poll-label" id="pollDragHandle">
-          <div class="poll-label-dot"></div>Enquete ao vivo
-          <span class="poll-drag-hint">⠿ arrastar</span>
-        </div>
-        <div class="poll-question" id="pollQuestion"></div>
-        <div id="pollBody"></div>
-      </div>
-
       <div class="video-btns">
         <button id="pipBtn" class="video-btn" onclick="togglePiP()" style="display:none">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><rect x="2" y="3" width="20" height="14" rx="2"/><rect x="13" y="9" width="8" height="6" rx="1"/></svg>
@@ -536,6 +526,16 @@
 
 <!-- Self camera preview -->
 <div id="selfPreview"><video id="selfVideo" autoplay muted playsinline></video></div>
+
+<!-- POLL CARD — fixed to body so drag works across entire screen -->
+<div id="pollCard">
+  <div class="poll-label" id="pollDragHandle">
+    <div class="poll-label-dot"></div>Enquete ao vivo
+    <span class="poll-drag-hint">⠿ arrastar</span>
+  </div>
+  <div class="poll-question" id="pollQuestion"></div>
+  <div id="pollBody"></div>
+</div>
 
 <!-- STREAM ENDED -->
 <div id="endedOverlay">
@@ -1088,34 +1088,26 @@
     const handle = document.getElementById('pollDragHandle');
     let dragging = false, startX, startY, origLeft, origTop;
 
-    function getPos() {
-      const area = card.parentElement.getBoundingClientRect();
-      const r = card.getBoundingClientRect();
-      return { left: r.left - area.left, top: r.top - area.top };
-    }
-
     function startDrag(cx, cy) {
       dragging = true;
-      const pos = getPos();
-      // switch from bottom-based to top-based positioning
+      // convert from bottom-based to top-based on first drag
+      const r = card.getBoundingClientRect();
       card.style.bottom = 'auto';
-      card.style.left = pos.left + 'px';
-      card.style.top  = pos.top  + 'px';
-      origLeft = pos.left;
-      origTop  = pos.top;
+      card.style.top  = r.top + 'px';
+      card.style.left = r.left + 'px';
+      origLeft = r.left;
+      origTop  = r.top;
       startX = cx; startY = cy;
       card.classList.add('dragging');
     }
 
     function moveDrag(cx, cy) {
       if (!dragging) return;
-      const area = card.parentElement;
-      const aW = area.clientWidth, aH = area.clientHeight;
       const cW = card.offsetWidth, cH = card.offsetHeight;
       let newLeft = origLeft + (cx - startX);
       let newTop  = origTop  + (cy - startY);
-      newLeft = Math.max(0, Math.min(newLeft, aW - cW));
-      newTop  = Math.max(0, Math.min(newTop,  aH - cH));
+      newLeft = Math.max(0, Math.min(newLeft, window.innerWidth  - cW));
+      newTop  = Math.max(0, Math.min(newTop,  window.innerHeight - cH));
       card.style.left = newLeft + 'px';
       card.style.top  = newTop  + 'px';
     }

@@ -243,13 +243,21 @@
       padding: 16px; z-index: 15;
       box-shadow: 0 12px 40px rgba(0,0,0,.6);
       animation: pollIn .25s ease;
+      user-select: none; -webkit-user-select: none;
+      touch-action: none;
     }
     @keyframes pollIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
     #pollCard.show { display: block; }
+    #pollCard.dragging { opacity: .9; box-shadow: 0 20px 60px rgba(0,0,0,.8); transition: none !important; }
     .poll-label {
       font-size: .6rem; font-weight: 700; text-transform: uppercase;
       letter-spacing: .8px; color: #a78bfa; margin-bottom: 8px;
       display: flex; align-items: center; gap: 6px;
+      cursor: grab;
+    }
+    .poll-label:active { cursor: grabbing; }
+    .poll-drag-hint {
+      font-size: .58rem; color: rgba(255,255,255,.25); margin-left: auto;
     }
     .poll-label-dot {
       width: 6px; height: 6px; border-radius: 50%;
@@ -412,7 +420,10 @@
 
       <!-- POLL CARD -->
       <div id="pollCard">
-        <div class="poll-label"><div class="poll-label-dot"></div>Enquete ao vivo</div>
+        <div class="poll-label" id="pollDragHandle">
+          <div class="poll-label-dot"></div>Enquete ao vivo
+          <span class="poll-drag-hint">⠿ arrastar</span>
+        </div>
         <div class="poll-question" id="pollQuestion"></div>
         <div id="pollBody"></div>
       </div>
@@ -1070,6 +1081,72 @@
     showToast('📊 Enquete encerrada');
     setTimeout(() => document.getElementById('pollCard').classList.remove('show'), 12000);
   });
+
+  // ── POLL DRAG ─────────────────────────────────────────────────────────────
+  (function() {
+    const card = document.getElementById('pollCard');
+    const handle = document.getElementById('pollDragHandle');
+    let dragging = false, startX, startY, origLeft, origTop;
+
+    function getPos() {
+      const area = card.parentElement.getBoundingClientRect();
+      const r = card.getBoundingClientRect();
+      return { left: r.left - area.left, top: r.top - area.top };
+    }
+
+    function startDrag(cx, cy) {
+      dragging = true;
+      const pos = getPos();
+      // switch from bottom-based to top-based positioning
+      card.style.bottom = 'auto';
+      card.style.left = pos.left + 'px';
+      card.style.top  = pos.top  + 'px';
+      origLeft = pos.left;
+      origTop  = pos.top;
+      startX = cx; startY = cy;
+      card.classList.add('dragging');
+    }
+
+    function moveDrag(cx, cy) {
+      if (!dragging) return;
+      const area = card.parentElement;
+      const aW = area.clientWidth, aH = area.clientHeight;
+      const cW = card.offsetWidth, cH = card.offsetHeight;
+      let newLeft = origLeft + (cx - startX);
+      let newTop  = origTop  + (cy - startY);
+      newLeft = Math.max(0, Math.min(newLeft, aW - cW));
+      newTop  = Math.max(0, Math.min(newTop,  aH - cH));
+      card.style.left = newLeft + 'px';
+      card.style.top  = newTop  + 'px';
+    }
+
+    function endDrag() {
+      dragging = false;
+      card.classList.remove('dragging');
+    }
+
+    // Touch
+    handle.addEventListener('touchstart', e => {
+      const t = e.touches[0];
+      startDrag(t.clientX, t.clientY);
+    }, { passive: true });
+    document.addEventListener('touchmove', e => {
+      if (!dragging) return;
+      e.preventDefault();
+      const t = e.touches[0];
+      moveDrag(t.clientX, t.clientY);
+    }, { passive: false });
+    document.addEventListener('touchend', endDrag);
+
+    // Mouse (desktop)
+    handle.addEventListener('mousedown', e => {
+      startDrag(e.clientX, e.clientY);
+    });
+    document.addEventListener('mousemove', e => {
+      if (dragging) moveDrag(e.clientX, e.clientY);
+    });
+    document.addEventListener('mouseup', endDrag);
+  })();
 </script>
 </body>
 </html>

@@ -133,6 +133,10 @@ io.on('connection', (socket) => {
   socket.on('chat:message', ({ message }) => {
     const room = rooms.get(socket.roomId);
     if (!room || !message.trim()) return;
+    if (socket.isViewer) {
+      const viewer = room.viewers.get(socket.id);
+      if (viewer && viewer.chatBanned) return;
+    }
 
     const msg = {
       id: Date.now(),
@@ -155,6 +159,46 @@ io.on('connection', (socket) => {
     if (!room || room.hostId !== socket.id) return;
     io.to(viewerId).emit('kicked', { message: 'Você foi removido da live pelo host.' });
     console.log(`[kick] ${viewerId} from ${socket.roomId}`);
+  });
+
+  socket.on('host:mute-viewer', ({ viewerId }) => {
+    const room = rooms.get(socket.roomId);
+    if (!room || room.hostId !== socket.id) return;
+    io.to(viewerId).emit('host:muted');
+  });
+
+  socket.on('host:unmute-viewer', ({ viewerId }) => {
+    const room = rooms.get(socket.roomId);
+    if (!room || room.hostId !== socket.id) return;
+    io.to(viewerId).emit('host:unmuted');
+  });
+
+  socket.on('host:disable-video', ({ viewerId }) => {
+    const room = rooms.get(socket.roomId);
+    if (!room || room.hostId !== socket.id) return;
+    io.to(viewerId).emit('host:video-off');
+  });
+
+  socket.on('host:enable-video', ({ viewerId }) => {
+    const room = rooms.get(socket.roomId);
+    if (!room || room.hostId !== socket.id) return;
+    io.to(viewerId).emit('host:video-on');
+  });
+
+  socket.on('host:ban-chat', ({ viewerId }) => {
+    const room = rooms.get(socket.roomId);
+    if (!room || room.hostId !== socket.id) return;
+    const viewer = room.viewers.get(viewerId);
+    if (viewer) viewer.chatBanned = true;
+    io.to(viewerId).emit('host:chat-banned');
+  });
+
+  socket.on('host:unban-chat', ({ viewerId }) => {
+    const room = rooms.get(socket.roomId);
+    if (!room || room.hostId !== socket.id) return;
+    const viewer = room.viewers.get(viewerId);
+    if (viewer) viewer.chatBanned = false;
+    io.to(viewerId).emit('host:chat-unbanned');
   });
 
   socket.on('host:pin-message', ({ msgId }) => {

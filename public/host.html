@@ -133,14 +133,48 @@
       background: linear-gradient(transparent, rgba(0,0,0,.85));
       padding: 14px 6px 6px;
     }
-    .tile-kick {
-      position: absolute; top: 6px; left: 50%; transform: translateX(-50%);
-      display: none; background: var(--red); border-radius: 6px;
-      padding: 3px 8px; font-size: .62rem; font-weight: 600; color: #fff;
-      cursor: pointer; border: none; white-space: nowrap;
-      box-shadow: 0 2px 8px rgba(244,63,94,.4);
+    .tile-menu-btn {
+      position: absolute; top: 5px; right: 5px; z-index: 3;
+      width: 22px; height: 22px; border-radius: 6px;
+      background: rgba(0,0,0,.55); border: none;
+      color: var(--muted2); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .15s; opacity: 0;
     }
-    .participant-tile:hover .tile-kick { display: block; }
+    .participant-tile:hover .tile-menu-btn { opacity: 1; }
+    .tile-menu-btn:hover { background: rgba(124,58,237,.7) !important; color: #fff; }
+    .tile-menu-btn svg { width: 12px; height: 12px; pointer-events: none; }
+
+    /* Global dropdown */
+    #tileDropdown {
+      display: none; position: fixed; z-index: 9999;
+      background: var(--card2); border: 1px solid var(--border2);
+      border-radius: 12px; padding: 5px; min-width: 170px;
+      box-shadow: 0 12px 40px rgba(0,0,0,.6);
+      animation: ddIn .12s ease;
+    }
+    @keyframes ddIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:none} }
+    #tileDropdown.open { display: block; }
+    .dd-header {
+      padding: 6px 10px 4px; font-size: .65rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .6px; color: var(--muted);
+      border-bottom: 1px solid var(--border); margin-bottom: 4px;
+    }
+    .dd-item {
+      display: flex; align-items: center; gap: 9px;
+      padding: 8px 10px; border-radius: 8px;
+      font-size: .78rem; font-weight: 500; color: var(--text);
+      cursor: pointer; border: none; background: none;
+      width: 100%; text-align: left; font-family: inherit;
+      transition: background .12s;
+    }
+    .dd-item:hover { background: rgba(255,255,255,.06); }
+    .dd-item svg { width: 14px; height: 14px; flex-shrink: 0; color: var(--muted2); }
+    .dd-item.dd-active { color: var(--green); }
+    .dd-item.dd-active svg { color: var(--green); }
+    .dd-item.dd-danger { color: var(--red); }
+    .dd-item.dd-danger svg { color: var(--red); }
+    .dd-sep { height: 1px; background: var(--border); margin: 4px 0; }
     .more-tile {
       flex-shrink: 0; width: 72px; height: var(--tile-h); border-radius: 12px;
       background: var(--card); border: 1px dashed var(--border2);
@@ -675,6 +709,28 @@
 <video id="screenVideo" autoplay muted playsinline style="display:none"></video>
 <video id="webcamVideo" autoplay muted playsinline style="display:none"></video>
 
+<!-- PARTICIPANT DROPDOWN -->
+<div id="tileDropdown">
+  <div class="dd-header" id="ddName">Participante</div>
+  <button class="dd-item" id="ddMute"    onclick="ddAction('mute')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
+    Mutar microfone
+  </button>
+  <button class="dd-item" id="ddVideo"   onclick="ddAction('video')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+    Desativar câmera
+  </button>
+  <button class="dd-item" id="ddChat"    onclick="ddAction('chat')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    Desativar chat
+  </button>
+  <div class="dd-sep"></div>
+  <button class="dd-item dd-danger" onclick="ddAction('kick')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    Remover da sala
+  </button>
+</div>
+
 <script>
   const socket = io();
   const canvas  = document.getElementById('previewCanvas');
@@ -1012,10 +1068,12 @@
       const name = document.createElement('div');
       name.className = 'tile-name'; name.textContent = v.username;
       tile.appendChild(name);
-      const kick = document.createElement('button');
-      kick.className = 'tile-kick'; kick.textContent = 'Remover';
-      kick.onclick = (e) => { e.stopPropagation(); kickViewer(id); };
-      tile.appendChild(kick);
+      const menuBtn = document.createElement('button');
+      menuBtn.className = 'tile-menu-btn';
+      menuBtn.title = 'Opções';
+      menuBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>`;
+      menuBtn.onclick = (e) => { e.stopPropagation(); openTileMenu(id, v.username, menuBtn); };
+      tile.appendChild(menuBtn);
       strip.appendChild(tile);
     });
     if (all.length > 8) {
@@ -1028,8 +1086,67 @@
 
   function kickViewer(viewerId) {
     socket.emit('host:kick', { viewerId });
-    delete viewers[viewerId]; renderTiles();
+    delete viewers[viewerId]; delete viewerStates[viewerId]; renderTiles();
   }
+
+  // ── TILE DROPDOWN ──────────────────────────────────────────────────────────
+  const viewerStates = {}; // { muted, videoOff, chatBanned }
+  let ddCurrentId = null;
+
+  function openTileMenu(id, username, btn) {
+    ddCurrentId = id;
+    const s = viewerStates[id] || {};
+    document.getElementById('ddName').textContent = username;
+
+    const ddMute  = document.getElementById('ddMute');
+    const ddVideo = document.getElementById('ddVideo');
+    const ddChat  = document.getElementById('ddChat');
+
+    ddMute.className  = 'dd-item' + (s.muted     ? ' dd-active' : '');
+    ddMute.querySelector('svg').style.color  = s.muted     ? 'var(--green)' : '';
+    ddMute.childNodes[2].textContent  = s.muted     ? ' Desmutar microfone'  : ' Mutar microfone';
+
+    ddVideo.className = 'dd-item' + (s.videoOff  ? ' dd-active' : '');
+    ddVideo.querySelector('svg').style.color = s.videoOff  ? 'var(--green)' : '';
+    ddVideo.childNodes[2].textContent = s.videoOff  ? ' Ativar câmera'        : ' Desativar câmera';
+
+    ddChat.className  = 'dd-item' + (s.chatBanned ? ' dd-active' : '');
+    ddChat.querySelector('svg').style.color  = s.chatBanned ? 'var(--green)' : '';
+    ddChat.childNodes[2].textContent  = s.chatBanned ? ' Ativar chat'           : ' Desativar chat';
+
+    const dd = document.getElementById('tileDropdown');
+    const r  = btn.getBoundingClientRect();
+    dd.style.top  = (r.bottom + 6) + 'px';
+    dd.style.left = Math.min(r.left, window.innerWidth - 185) + 'px';
+    dd.classList.add('open');
+  }
+
+  function ddAction(action) {
+    const id = ddCurrentId;
+    if (!id) return;
+    const s = viewerStates[id] = viewerStates[id] || {};
+    if (action === 'mute') {
+      s.muted = !s.muted;
+      socket.emit(s.muted ? 'host:mute-viewer' : 'host:unmute-viewer', { viewerId: id });
+    } else if (action === 'video') {
+      s.videoOff = !s.videoOff;
+      socket.emit(s.videoOff ? 'host:disable-video' : 'host:enable-video', { viewerId: id });
+    } else if (action === 'chat') {
+      s.chatBanned = !s.chatBanned;
+      socket.emit(s.chatBanned ? 'host:ban-chat' : 'host:unban-chat', { viewerId: id });
+    } else if (action === 'kick') {
+      kickViewer(id);
+    }
+    document.getElementById('tileDropdown').classList.remove('open');
+    ddCurrentId = null;
+  }
+
+  document.addEventListener('click', (e) => {
+    const dd = document.getElementById('tileDropdown');
+    if (dd.classList.contains('open') && !dd.contains(e.target)) {
+      dd.classList.remove('open'); ddCurrentId = null;
+    }
+  });
 
   // ── END LIVE ──────────────────────────────────────────────────────────────
   function showEndModal() { document.getElementById('endModal').classList.add('open'); }

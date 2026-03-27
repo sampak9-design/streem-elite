@@ -774,6 +774,58 @@
     if (upstreamPC && candidate) await upstreamPC.addIceCandidate(new RTCIceCandidate(candidate));
   });
 
+  // ── HOST COMMANDS ──────────────────────────────────────────────────────────
+  socket.on('host:muted', () => {
+    if (viewerMicStream) viewerMicStream.getAudioTracks().forEach(t => t.enabled = false);
+    micEnabled = false;
+    document.getElementById('ctrlMic').classList.add('off');
+    document.getElementById('ctrlMic').classList.remove('active');
+    showToast('🔇 Host mutou seu microfone');
+  });
+
+  socket.on('host:unmuted', () => {
+    if (viewerMicStream) viewerMicStream.getAudioTracks().forEach(t => t.enabled = true);
+    micEnabled = true;
+    document.getElementById('ctrlMic').classList.remove('off');
+    showToast('🎙️ Host ativou seu microfone');
+  });
+
+  socket.on('host:video-off', () => {
+    if (viewerCamStream) viewerCamStream.getVideoTracks().forEach(t => t.enabled = false);
+    camEnabled = false;
+    document.getElementById('ctrlCam').classList.add('off');
+    document.getElementById('ctrlCam').classList.remove('active');
+    document.getElementById('selfPreview').classList.remove('show');
+    showToast('📵 Host desativou sua câmera');
+  });
+
+  socket.on('host:video-on', () => {
+    if (viewerCamStream) viewerCamStream.getVideoTracks().forEach(t => t.enabled = true);
+    camEnabled = true;
+    document.getElementById('ctrlCam').classList.remove('off');
+    showToast('📷 Host ativou sua câmera');
+  });
+
+  socket.on('host:chat-banned', () => {
+    const inp = document.getElementById('chatInput');
+    inp.disabled = true; inp.placeholder = 'Chat desativado pelo host';
+    showToast('🚫 Host desativou seu chat');
+  });
+
+  socket.on('host:chat-unbanned', () => {
+    const inp = document.getElementById('chatInput');
+    inp.disabled = false; inp.placeholder = 'Comentar...';
+    showToast('✅ Chat reativado pelo host');
+  });
+
+  function showToast(msg) {
+    const t = document.createElement('div');
+    t.style.cssText = 'position:fixed;top:70px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);color:#fff;padding:8px 18px;border-radius:20px;font-size:.8rem;font-weight:600;z-index:9999;white-space:nowrap;pointer-events:none;';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3000);
+  }
+
   // ── LEAVE ─────────────────────────────────────────────────────────────────
   function leaveStream() {
     if (pc) pc.close();

@@ -69,6 +69,9 @@
     .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--live); animation: pulse 1s infinite; }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
     @keyframes floatUp { 0%{opacity:1;transform:translateY(0) scale(1)} 100%{opacity:0;transform:translateY(-200px) scale(1.5)} }
+    .react-btn { font-size:1.5rem; background:none; border:none; cursor:pointer; padding:4px 6px; border-radius:8px; transition:background .12s,transform .1s; line-height:1; }
+    .react-btn:hover { background:rgba(255,255,255,.08); transform:scale(1.25); }
+    .react-btn:active { transform:scale(.9); }
     .stat-pill {
       display: flex; align-items: center; gap: 6px;
       background: var(--card); border: 1px solid var(--border);
@@ -423,6 +426,29 @@
       </button>
       <span class="ctrl-label">Chat</span>
     </div>
+    <!-- REACTIONS -->
+    <div class="ctrl-wrap" style="position:relative;">
+      <button class="ctrl-btn" id="ctrlReact" onclick="toggleReactionPicker()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+      </button>
+      <span class="ctrl-label">Reações</span>
+      <!-- Picker -->
+      <div id="reactionPicker" style="display:none;position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#1a1a2e;border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:10px 12px;display:none;flex-wrap:wrap;gap:6px;max-width:280px;justify-content:center;z-index:200;box-shadow:0 8px 32px rgba(0,0,0,.6);">
+        <span style="width:100%;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#64748b;margin-bottom:2px;">Enviar reação</span>
+        <button class="react-btn" onclick="sendViewerReaction('❤️')">❤️</button>
+        <button class="react-btn" onclick="sendViewerReaction('👍')">👍</button>
+        <button class="react-btn" onclick="sendViewerReaction('🎉')">🎉</button>
+        <button class="react-btn" onclick="sendViewerReaction('👏')">👏</button>
+        <button class="react-btn" onclick="sendViewerReaction('😄')">😄</button>
+        <button class="react-btn" onclick="sendViewerReaction('😮')">😮</button>
+        <button class="react-btn" onclick="sendViewerReaction('🔥')">🔥</button>
+        <button class="react-btn" onclick="sendViewerReaction('💎')">💎</button>
+        <button class="react-btn" onclick="sendViewerReaction('💸')">💸</button>
+        <button class="react-btn" onclick="sendViewerReaction('🚀')">🚀</button>
+        <button class="react-btn" onclick="sendViewerReaction('👑')">👑</button>
+        <button class="react-btn" onclick="sendViewerReaction('🙌')">🙌</button>
+      </div>
+    </div>
     <!-- FULLSCREEN -->
     <div class="ctrl-wrap">
       <button class="ctrl-btn" onclick="toggleFullscreen()">
@@ -607,6 +633,28 @@
 
   // ── STREAM ENDED ─────────────────────────────────────────────────────────
   socket.on('chat:reaction', ({ emoji }) => spawnReaction(emoji));
+
+  function sendViewerReaction(emoji) {
+    socket.emit('chat:reaction', { emoji });
+    spawnReaction(emoji);
+    // fecha picker e anima botão
+    toggleReactionPicker(false);
+  }
+
+  let pickerOpen = false;
+  function toggleReactionPicker(force) {
+    pickerOpen = force !== undefined ? force : !pickerOpen;
+    const p = document.getElementById('reactionPicker');
+    p.style.display = pickerOpen ? 'flex' : 'none';
+    document.getElementById('ctrlReact').classList.toggle('active', pickerOpen);
+  }
+
+  // fecha picker ao clicar fora
+  document.addEventListener('click', (e) => {
+    if (pickerOpen && !e.target.closest('#reactionPicker') && !e.target.closest('#ctrlReact')) {
+      toggleReactionPicker(false);
+    }
+  });
 
   function spawnReaction(emoji) {
     const el = document.createElement('div');

@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Streem Elite — Assistir</title>
   <script src="/socket.io/socket.io.js"></script>
   <style>
@@ -20,6 +20,7 @@
       --live:    #ff3b3b;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    button, a { touch-action: manipulation; }
     body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
     /* ── JOIN SCREEN ── */
@@ -291,12 +292,11 @@
       .video-btn { padding: 4px 7px; font-size: 0.68rem; }
       .video-btn span { display: none; }
 
-      /* bottom bar FIXA — teclado não empurra */
+      /* bottom bar — pai já é fixed (#bottomGroup) */
       .bottom-bar {
-        position: fixed; bottom: 0; left: 0; right: 0;
+        position: static;
         gap: 6px; padding: 10px 8px 24px;
         justify-content: space-around;
-        z-index: 40;
       }
       .ctrl-btn  { width: 48px; height: 48px; }
       .ctrl-btn.leave { width: 52px; height: 52px; }
@@ -400,24 +400,25 @@
     </div>
   </div>
 
-  <!-- REACTION BAR (above bottom bar) -->
-  <div id="reactionBar" style="display:none;position:fixed;bottom:88px;left:0;right:0;z-index:39;background:rgba(13,13,26,.97);border-top:1px solid rgba(255,255,255,.08);padding:8px 10px;overflow-x:auto;white-space:nowrap;scrollbar-width:none;-webkit-overflow-scrolling:touch;">
-    <button class="react-btn" onclick="sendViewerReaction('❤️')">❤️</button>
-    <button class="react-btn" onclick="sendViewerReaction('👍')">👍</button>
-    <button class="react-btn" onclick="sendViewerReaction('🎉')">🎉</button>
-    <button class="react-btn" onclick="sendViewerReaction('👏')">👏</button>
-    <button class="react-btn" onclick="sendViewerReaction('😄')">😄</button>
-    <button class="react-btn" onclick="sendViewerReaction('😮')">😮</button>
-    <button class="react-btn" onclick="sendViewerReaction('🔥')">🔥</button>
-    <button class="react-btn" onclick="sendViewerReaction('💎')">💎</button>
-    <button class="react-btn" onclick="sendViewerReaction('💸')">💸</button>
-    <button class="react-btn" onclick="sendViewerReaction('🚀')">🚀</button>
-    <button class="react-btn" onclick="sendViewerReaction('👑')">👑</button>
-    <button class="react-btn" onclick="sendViewerReaction('🙌')">🙌</button>
-    <button class="react-btn" onclick="sendViewerReaction('😢')">😢</button>
-    <button class="react-btn" onclick="sendViewerReaction('🤩')">🤩</button>
-    <button class="react-btn" onclick="sendViewerReaction('💪')">💪</button>
-  </div>
+  <!-- BOTTOM GROUP: reações + controles, sempre juntos no rodapé -->
+  <div id="bottomGroup" style="position:fixed;bottom:0;left:0;right:0;z-index:40;">
+    <div id="reactionBar" style="display:none;background:rgba(13,13,26,.97);border-top:1px solid rgba(255,255,255,.08);padding:8px 12px;overflow-x:auto;white-space:nowrap;scrollbar-width:none;-webkit-overflow-scrolling:touch;">
+      <button class="react-btn" onclick="sendViewerReaction('❤️')">❤️</button>
+      <button class="react-btn" onclick="sendViewerReaction('👍')">👍</button>
+      <button class="react-btn" onclick="sendViewerReaction('🎉')">🎉</button>
+      <button class="react-btn" onclick="sendViewerReaction('👏')">👏</button>
+      <button class="react-btn" onclick="sendViewerReaction('😄')">😄</button>
+      <button class="react-btn" onclick="sendViewerReaction('😮')">😮</button>
+      <button class="react-btn" onclick="sendViewerReaction('🔥')">🔥</button>
+      <button class="react-btn" onclick="sendViewerReaction('💎')">💎</button>
+      <button class="react-btn" onclick="sendViewerReaction('💸')">💸</button>
+      <button class="react-btn" onclick="sendViewerReaction('🚀')">🚀</button>
+      <button class="react-btn" onclick="sendViewerReaction('👑')">👑</button>
+      <button class="react-btn" onclick="sendViewerReaction('🙌')">🙌</button>
+      <button class="react-btn" onclick="sendViewerReaction('😢')">😢</button>
+      <button class="react-btn" onclick="sendViewerReaction('🤩')">🤩</button>
+      <button class="react-btn" onclick="sendViewerReaction('💪')">💪</button>
+    </div>
 
   <!-- BOTTOM CONTROL BAR -->
   <div class="bottom-bar">
@@ -467,7 +468,7 @@
       <span class="ctrl-label">Sair</span>
     </div>
   </div>
-</div>
+  </div><!-- /bottomGroup -->
 
 <div id="pipBanner">Live continua rodando em segundo plano ▶</div>
 

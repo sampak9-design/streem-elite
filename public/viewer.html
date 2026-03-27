@@ -400,6 +400,25 @@
     </div>
   </div>
 
+  <!-- REACTION BAR (above bottom bar) -->
+  <div id="reactionBar" style="display:none;position:fixed;bottom:88px;left:0;right:0;z-index:39;background:rgba(13,13,26,.97);border-top:1px solid rgba(255,255,255,.08);padding:8px 10px;overflow-x:auto;white-space:nowrap;scrollbar-width:none;-webkit-overflow-scrolling:touch;">
+    <button class="react-btn" onclick="sendViewerReaction('❤️')">❤️</button>
+    <button class="react-btn" onclick="sendViewerReaction('👍')">👍</button>
+    <button class="react-btn" onclick="sendViewerReaction('🎉')">🎉</button>
+    <button class="react-btn" onclick="sendViewerReaction('👏')">👏</button>
+    <button class="react-btn" onclick="sendViewerReaction('😄')">😄</button>
+    <button class="react-btn" onclick="sendViewerReaction('😮')">😮</button>
+    <button class="react-btn" onclick="sendViewerReaction('🔥')">🔥</button>
+    <button class="react-btn" onclick="sendViewerReaction('💎')">💎</button>
+    <button class="react-btn" onclick="sendViewerReaction('💸')">💸</button>
+    <button class="react-btn" onclick="sendViewerReaction('🚀')">🚀</button>
+    <button class="react-btn" onclick="sendViewerReaction('👑')">👑</button>
+    <button class="react-btn" onclick="sendViewerReaction('🙌')">🙌</button>
+    <button class="react-btn" onclick="sendViewerReaction('😢')">😢</button>
+    <button class="react-btn" onclick="sendViewerReaction('🤩')">🤩</button>
+    <button class="react-btn" onclick="sendViewerReaction('💪')">💪</button>
+  </div>
+
   <!-- BOTTOM CONTROL BAR -->
   <div class="bottom-bar">
     <!-- MIC -->
@@ -432,22 +451,6 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
       </button>
       <span class="ctrl-label">Reações</span>
-      <!-- Picker -->
-      <div id="reactionPicker" style="display:none;position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#1a1a2e;border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:10px 12px;display:none;flex-wrap:wrap;gap:6px;max-width:280px;justify-content:center;z-index:200;box-shadow:0 8px 32px rgba(0,0,0,.6);">
-        <span style="width:100%;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#64748b;margin-bottom:2px;">Enviar reação</span>
-        <button class="react-btn" onclick="sendViewerReaction('❤️')">❤️</button>
-        <button class="react-btn" onclick="sendViewerReaction('👍')">👍</button>
-        <button class="react-btn" onclick="sendViewerReaction('🎉')">🎉</button>
-        <button class="react-btn" onclick="sendViewerReaction('👏')">👏</button>
-        <button class="react-btn" onclick="sendViewerReaction('😄')">😄</button>
-        <button class="react-btn" onclick="sendViewerReaction('😮')">😮</button>
-        <button class="react-btn" onclick="sendViewerReaction('🔥')">🔥</button>
-        <button class="react-btn" onclick="sendViewerReaction('💎')">💎</button>
-        <button class="react-btn" onclick="sendViewerReaction('💸')">💸</button>
-        <button class="react-btn" onclick="sendViewerReaction('🚀')">🚀</button>
-        <button class="react-btn" onclick="sendViewerReaction('👑')">👑</button>
-        <button class="react-btn" onclick="sendViewerReaction('🙌')">🙌</button>
-      </div>
     </div>
     <!-- FULLSCREEN -->
     <div class="ctrl-wrap">
@@ -637,24 +640,15 @@
   function sendViewerReaction(emoji) {
     socket.emit('chat:reaction', { emoji });
     spawnReaction(emoji);
-    // fecha picker e anima botão
-    toggleReactionPicker(false);
+    // NÃO fecha — fica aberto para enviar mais reações
   }
 
   let pickerOpen = false;
-  function toggleReactionPicker(force) {
-    pickerOpen = force !== undefined ? force : !pickerOpen;
-    const p = document.getElementById('reactionPicker');
-    p.style.display = pickerOpen ? 'flex' : 'none';
+  function toggleReactionPicker() {
+    pickerOpen = !pickerOpen;
+    document.getElementById('reactionBar').style.display = pickerOpen ? 'block' : 'none';
     document.getElementById('ctrlReact').classList.toggle('active', pickerOpen);
   }
-
-  // fecha picker ao clicar fora
-  document.addEventListener('click', (e) => {
-    if (pickerOpen && !e.target.closest('#reactionPicker') && !e.target.closest('#ctrlReact')) {
-      toggleReactionPicker(false);
-    }
-  });
 
   function spawnReaction(emoji) {
     const el = document.createElement('div');

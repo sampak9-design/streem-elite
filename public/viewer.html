@@ -68,6 +68,7 @@
     }
     .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--live); animation: pulse 1s infinite; }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+    @keyframes floatUp { 0%{opacity:1;transform:translateY(0) scale(1)} 100%{opacity:0;transform:translateY(-200px) scale(1.5)} }
     .stat-pill {
       display: flex; align-items: center; gap: 6px;
       background: var(--card); border: 1px solid var(--border);
@@ -605,6 +606,18 @@
   }
 
   // ── STREAM ENDED ─────────────────────────────────────────────────────────
+  socket.on('chat:reaction', ({ emoji }) => spawnReaction(emoji));
+
+  function spawnReaction(emoji) {
+    const el = document.createElement('div');
+    el.style.cssText = 'position:fixed;font-size:2rem;pointer-events:none;z-index:999;animation:floatUp 2.2s ease forwards;';
+    el.textContent = emoji;
+    el.style.left = (20 + Math.random() * 60) + '%';
+    el.style.bottom = '100px';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 2200);
+  }
+
   socket.on('stream:ended', ({ message }) => {
     document.getElementById('endedMsg').textContent = message || 'A live foi encerrada.';
     document.getElementById('endedOverlay').classList.add('show');

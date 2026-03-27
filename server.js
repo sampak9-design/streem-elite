@@ -201,6 +201,12 @@ io.on('connection', (socket) => {
     io.to(viewerId).emit('host:chat-unbanned');
   });
 
+  socket.on('chat:reaction', ({ emoji }) => {
+    const room = rooms.get(socket.roomId);
+    if (!room) return;
+    io.to(socket.roomId).emit('chat:reaction', { emoji });
+  });
+
   socket.on('host:pin-message', ({ msgId }) => {
     io.to(socket.roomId).emit('chat:pinned', { msgId });
   });

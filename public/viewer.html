@@ -234,6 +234,50 @@
     }
     .send-btn:hover { background: var(--accent2); }
 
+    /* ── POLL CARD ── */
+    #pollCard {
+      display: none; position: absolute; bottom: 14px; left: 14px;
+      width: min(290px, calc(100% - 28px));
+      background: rgba(10,10,15,.95); backdrop-filter: blur(16px);
+      border: 1px solid rgba(124,58,237,.45); border-radius: 16px;
+      padding: 16px; z-index: 15;
+      box-shadow: 0 12px 40px rgba(0,0,0,.6);
+      animation: pollIn .25s ease;
+    }
+    @keyframes pollIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+    #pollCard.show { display: block; }
+    .poll-label {
+      font-size: .6rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .8px; color: #a78bfa; margin-bottom: 8px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .poll-label-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #a78bfa; animation: pulse 1s infinite;
+    }
+    .poll-question {
+      font-size: .88rem; font-weight: 600; color: var(--text);
+      margin-bottom: 12px; line-height: 1.4;
+    }
+    .poll-options { display: flex; flex-direction: column; gap: 7px; }
+    .poll-opt-btn {
+      width: 100%; padding: 9px 14px; border-radius: 10px; text-align: left;
+      background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1);
+      color: var(--text); font-size: .82rem; font-weight: 500;
+      cursor: pointer; font-family: inherit;
+      transition: background .15s, border-color .15s;
+    }
+    .poll-opt-btn:hover { background: rgba(124,58,237,.2); border-color: rgba(124,58,237,.5); }
+    /* results bars */
+    .poll-result-row { margin-bottom: 8px; }
+    .poll-result-header { display: flex; justify-content: space-between; font-size: .76rem; margin-bottom: 4px; }
+    .poll-result-label { font-weight: 500; color: var(--text); }
+    .poll-result-pct { font-weight: 700; color: #a78bfa; }
+    .poll-bar-bg { height: 6px; background: rgba(255,255,255,.07); border-radius: 3px; overflow: hidden; }
+    .poll-bar { height: 100%; background: linear-gradient(90deg, #7c3aed, #a78bfa); border-radius: 3px; transition: width .5s ease; }
+    .poll-bar.winner { background: linear-gradient(90deg, #10b981, #34d399); }
+    .poll-voted-info { font-size: .68rem; color: var(--muted); margin-top: 10px; text-align: center; }
+
     /* ── ENDED OVERLAY ── */
     #endedOverlay {
       display: none; position: fixed; inset: 0; background: rgba(0,0,0,.85);
@@ -364,6 +408,13 @@
         </svg>
         <p>Toque aqui para habilitar PiP automático</p>
         <small>O vídeo vai flutuar quando você minimizar</small>
+      </div>
+
+      <!-- POLL CARD -->
+      <div id="pollCard">
+        <div class="poll-label"><div class="poll-label-dot"></div>Enquete ao vivo</div>
+        <div class="poll-question" id="pollQuestion"></div>
+        <div id="pollBody"></div>
       </div>
 
       <div class="video-btns">
@@ -523,7 +574,7 @@
     socket.emit('viewer:join', { roomId: code, username: uname || null });
   }
 
-  socket.on('viewer:joined:ok', ({ title, viewerCount, recentChat, hostId: hid }) => {
+  socket.on('viewer:joined:ok', ({ title, viewerCount, recentChat, hostId: hid, activePoll }) => {
     hostId = hid;
     document.getElementById('streamTitle').textContent = title;
     document.getElementById('viewerCount').textContent = viewerCount;
@@ -531,6 +582,8 @@
     document.getElementById('mainView').style.display = 'flex';
 
     recentChat.forEach(msg => appendMsg(msg));
+
+    if (activePoll) showPoll(activePoll.question, activePoll.options, activePoll.total);
 
     // Create peer connection ready to receive
     createPC();
@@ -959,6 +1012,64 @@
   function esc(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
+
+  // ── POLL ──────────────────────────────────────────────────────────────────
+  let pollVoted = false;
+
+  function showPoll(question, options, total) {
+    pollVoted = false;
+    document.getElementById('pollQuestion').textContent = question;
+    renderPollOptions(options);
+    document.getElementById('pollCard').classList.add('show');
+  }
+
+  function renderPollOptions(options) {
+    const body = document.getElementById('pollBody');
+    body.innerHTML = `<div class="poll-options">${
+      options.map((o, i) =>
+        `<button class="poll-opt-btn" onclick="votePoll(${i})">${esc(o.text)}</button>`
+      ).join('')
+    }</div>`;
+  }
+
+  function renderPollResults(options, total, ended) {
+    const maxVotes = Math.max(...options.map(o => o.votes), 1);
+    const body = document.getElementById('pollBody');
+    body.innerHTML = options.map(o => {
+      const pct = total > 0 ? Math.round(o.votes / total * 100) : 0;
+      const isWinner = ended && o.votes === maxVotes && o.votes > 0;
+      return `<div class="poll-result-row">
+        <div class="poll-result-header">
+          <span class="poll-result-label">${esc(o.text)}</span>
+          <span class="poll-result-pct">${pct}%</span>
+        </div>
+        <div class="poll-bar-bg">
+          <div class="poll-bar${isWinner ? ' winner' : ''}" style="width:${pct}%"></div>
+        </div>
+      </div>`;
+    }).join('') + `<div class="poll-voted-info">${total} voto${total !== 1 ? 's' : ''}${ended ? ' · Encerrada' : ''}</div>`;
+  }
+
+  function votePoll(optionIndex) {
+    if (pollVoted) return;
+    pollVoted = true;
+    socket.emit('poll:vote', { optionIndex });
+  }
+
+  socket.on('poll:started', ({ question, options }) => {
+    showPoll(question, options, 0);
+    showToast('📊 Enquete iniciada!');
+  });
+
+  socket.on('poll:update', ({ options, total }) => {
+    if (pollVoted) renderPollResults(options, total, false);
+  });
+
+  socket.on('poll:ended', ({ options, total }) => {
+    renderPollResults(options, total, true);
+    showToast('📊 Enquete encerrada');
+    setTimeout(() => document.getElementById('pollCard').classList.remove('show'), 12000);
+  });
 </script>
 </body>
 </html>

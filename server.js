@@ -38,7 +38,8 @@ io.on('connection', (socket) => {
       chat: [],
       startTime: Date.now(),
       fakeViewers: 0,
-      bannedWords: []
+      bannedWords: [],
+      poll: null
     });
     socket.join(roomId);
     socket.roomId = roomId;
@@ -76,7 +77,12 @@ io.on('connection', (socket) => {
       title: room.title,
       viewerCount: room.viewers.size,
       recentChat: room.chat.slice(-50),
-      hostId: room.hostId
+      hostId: room.hostId,
+      activePoll: room.poll ? {
+        question: room.poll.question,
+        options: room.poll.options,
+        total: room.poll.options.reduce((s, o) => s + o.votes, 0)
+      } : null
     });
 
     // Ask host to send an offer to this viewer
@@ -269,6 +275,43 @@ io.on('connection', (socket) => {
     const room = rooms.get(socket.roomId);
     if (!room) return;
     io.to(socket.roomId).emit('chat:reaction', { emoji });
+  });
+
+  // ─── POLL ──────────────────────────────────────────────────────────────────
+
+  socket.on('poll:create', ({ question, options }) => {
+    const room = rooms.get(socket.roomId);
+    if (!room || room.hostId !== socket.id) return;
+    if (!question || !options || options.length < 2) return;
+    room.poll = {
+      question: question.trim().slice(0, 200),
+      options: options.map(t => ({ text: t.trim().slice(0, 100), votes: 0 })),
+      active: true,
+      voters: new Set()
+    };
+    io.to(socket.roomId).emit('poll:started', {
+      question: room.poll.question,
+      options: room.poll.options
+    });
+  });
+
+  socket.on('poll:vote', ({ optionIndex }) => {
+    const room = rooms.get(socket.roomId);
+    if (!room || !room.poll || !room.poll.active) return;
+    if (room.poll.voters.has(socket.id)) return;
+    if (optionIndex < 0 || optionIndex >= room.poll.options.length) return;
+    room.poll.voters.add(socket.id);
+    room.poll.options[optionIndex].votes++;
+    const total = room.poll.options.reduce((s, o) => s + o.votes, 0);
+    io.to(socket.roomId).emit('poll:update', { options: room.poll.options, total });
+  });
+
+  socket.on('poll:end', () => {
+    const room = rooms.get(socket.roomId);
+    if (!room || room.hostId !== socket.id || !room.poll) return;
+    const total = room.poll.options.reduce((s, o) => s + o.votes, 0);
+    io.to(socket.roomId).emit('poll:ended', { options: room.poll.options, total });
+    room.poll = null;
   });
 
   socket.on('host:pin-message', ({ msgId }) => {

@@ -966,9 +966,12 @@
     }
   }
 
-  // Fullscreen change event — resume in case browser paused on transition
-  document.addEventListener('fullscreenchange', resumeAfterFullscreen);
-  document.addEventListener('webkitfullscreenchange', resumeAfterFullscreen);
+  // Fullscreen change event — wait for browser to fully complete transition before resuming
+  function onFullscreenChange() {
+    setTimeout(resumeAfterFullscreen, 400);
+  }
+  document.addEventListener('fullscreenchange', onFullscreenChange);
+  document.addEventListener('webkitfullscreenchange', onFullscreenChange);
 
   // ── HELPERS ───────────────────────────────────────────────────────────────
   function showError(msg) {

@@ -718,17 +718,23 @@
 
   async function openBroker() {
     const video = document.getElementById('remoteVideo');
-    // Abrir ANTES do await — mobile bloqueia window.open após operações async
-    // Nome fixo 'nxt_broker' reutiliza a mesma aba em cliques subsequentes
-    window.open(BROKER_URL, 'nxt_broker');
-    // Entrar em PiP depois de abrir
-    try {
-      if (!document.pictureInPictureElement) {
-        await video.requestPictureInPicture();
-      }
-    } catch(e) {
-      console.warn('PiP error:', e);
-    }
+
+    // 1) Disparar PiP de forma síncrona — precisa estar no contexto do gesto
+    const pipPromise = (document.pictureInPictureEnabled && !document.pictureInPictureElement)
+      ? video.requestPictureInPicture()
+      : null;
+
+    // 2) Abrir corretora via <a> — mais confiável que window.open no mobile
+    const a = document.createElement('a');
+    a.href = BROKER_URL;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    // 3) Aguardar PiP e garantir que vídeo continua
+    if (pipPromise) await pipPromise.catch(() => {});
     if (video.paused) video.play().catch(() => {});
   }
 

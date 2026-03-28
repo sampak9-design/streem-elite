@@ -946,31 +946,23 @@
 
   function toggleFullscreen() {
     const vid = document.getElementById('remoteVideo');
-    const area = document.querySelector('.video-area');
 
-    // iOS Safari: usa webkitEnterFullscreen no <video>
-    if (vid.webkitEnterFullscreen) {
-      if (document.webkitFullscreenElement || vid.webkitDisplayingFullscreen) {
-        vid.webkitExitFullscreen ? vid.webkitExitFullscreen() : document.webkitExitFullscreen();
+    // iOS Safari: webkitEnterFullscreen direto no <video>
+    if (vid.webkitEnterFullscreen && !document.fullscreenEnabled) {
+      if (vid.webkitDisplayingFullscreen) {
+        document.webkitExitFullscreen();
       } else {
         vid.webkitEnterFullscreen();
       }
-      // iOS pauses on fullscreen transitions — resume after a tick
       setTimeout(resumeAfterFullscreen, 300);
       return;
     }
 
-    // Android / Chrome: fullscreen normal
+    // Android / Chrome / desktop
     if (!document.fullscreenElement) {
-      (area.requestFullscreen || area.webkitRequestFullscreen).call(area).then(() => {
-        try { screen.orientation.lock('landscape').catch(() => {}); } catch(e) {}
-        resumeAfterFullscreen();
-      }).catch(() => {});
+      vid.requestFullscreen().then(resumeAfterFullscreen).catch(() => {});
     } else {
-      (document.exitFullscreen || document.webkitExitFullscreen).call(document).then(() => {
-        try { screen.orientation.unlock(); } catch(e) {}
-        resumeAfterFullscreen();
-      }).catch(() => {});
+      document.exitFullscreen().then(resumeAfterFullscreen).catch(() => {});
     }
   }
 

@@ -486,8 +486,8 @@
     </div>
     <!-- FULLSCREEN -->
     <div class="ctrl-wrap">
-      <button class="ctrl-btn" onclick="toggleFullscreen()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+      <button class="ctrl-btn" id="ctrlFs" onclick="toggleFullscreen()">
+        <svg id="fsIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
       </button>
       <span class="ctrl-label">Tela cheia</span>
     </div>
@@ -938,40 +938,22 @@
     }
   });
 
-  // ── FULLSCREEN ────────────────────────────────────────────────────────────
-  function resumeAfterFullscreen() {
-    const vid = document.getElementById('remoteVideo');
-    if (vid.paused) vid.play().catch(() => {});
-  }
+  // ── FULLSCREEN (CSS-based — evita bugs da API nativa no mobile) ───────────
+  let isFullscreen = false;
 
   function toggleFullscreen() {
     const vid = document.getElementById('remoteVideo');
+    isFullscreen = !isFullscreen;
 
-    // iOS Safari: webkitEnterFullscreen direto no <video>
-    if (vid.webkitEnterFullscreen && !document.fullscreenEnabled) {
-      if (vid.webkitDisplayingFullscreen) {
-        document.webkitExitFullscreen();
-      } else {
-        vid.webkitEnterFullscreen();
-      }
-      setTimeout(resumeAfterFullscreen, 300);
-      return;
-    }
-
-    // Android / Chrome / desktop
-    if (!document.fullscreenElement) {
-      vid.requestFullscreen().then(resumeAfterFullscreen).catch(() => {});
+    if (isFullscreen) {
+      vid.style.cssText = 'position:fixed;inset:0;width:100%!important;height:100%!important;z-index:9000;background:#000;object-fit:contain;';
+      document.getElementById('fsIcon').innerHTML = '<path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>';
     } else {
-      document.exitFullscreen().then(resumeAfterFullscreen).catch(() => {});
+      vid.style.cssText = '';
+      document.getElementById('fsIcon').innerHTML = '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>';
+      if (vid.paused) vid.play().catch(() => {});
     }
   }
-
-  // Fullscreen change event — wait for browser to fully complete transition before resuming
-  function onFullscreenChange() {
-    setTimeout(resumeAfterFullscreen, 400);
-  }
-  document.addEventListener('fullscreenchange', onFullscreenChange);
-  document.addEventListener('webkitfullscreenchange', onFullscreenChange);
 
   // ── HELPERS ───────────────────────────────────────────────────────────────
   function showError(msg) {

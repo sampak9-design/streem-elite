@@ -398,9 +398,9 @@
 
 
       <div class="video-btns">
-        <button id="pipBtn" class="video-btn" onclick="openBroker()" style="display:none">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-          Abrir corretora
+        <button id="pipBtn" class="video-btn" onclick="togglePiP()" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><rect x="2" y="3" width="20" height="14" rx="2"/><rect x="13" y="9" width="8" height="6" rx="1"/></svg>
+          Pip
         </button>
         <button class="video-btn" onclick="toggleFullscreen()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
@@ -714,27 +714,20 @@
 
   // ── PICTURE-IN-PICTURE ────────────────────────────────────────────────────
 
-  const BROKER_URL = 'https://trade.nxtoptions.com/pt/traderoom';
-
-  async function openBroker() {
+  async function togglePiP() {
     const video = document.getElementById('remoteVideo');
-
-    // 1) Disparar PiP de forma síncrona — precisa estar no contexto do gesto
-    const pipPromise = (document.pictureInPictureEnabled && !document.pictureInPictureElement)
-      ? video.requestPictureInPicture()
-      : null;
-
-    // 2) Abrir corretora via <a> — mais confiável que window.open no mobile
-    const a = document.createElement('a');
-    a.href = BROKER_URL;
-    a.target = '_blank';
-    a.rel = 'noopener noreferrer';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-
-    // 3) Aguardar PiP e garantir que vídeo continua
-    if (pipPromise) await pipPromise.catch(() => {});
+    const btn   = document.getElementById('pipBtn');
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+        btn.classList.remove('pip-active');
+      } else {
+        await video.requestPictureInPicture();
+        btn.classList.add('pip-active');
+      }
+    } catch(e) {
+      console.warn('PiP error:', e);
+    }
     if (video.paused) video.play().catch(() => {});
   }
 

@@ -407,6 +407,11 @@
           Tela cheia
         </button>
       </div>
+
+      <!-- Botão fechar tela cheia — só aparece quando fullscreen CSS está ativo -->
+      <button id="fsCloseBtn" onclick="toggleFullscreen()" style="display:none;position:fixed;top:14px;right:14px;z-index:9100;background:rgba(0,0,0,.7);border:1px solid rgba(255,255,255,.2);border-radius:50%;width:42px;height:42px;color:#fff;cursor:pointer;align-items:center;justify-content:center;backdrop-filter:blur(8px);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
     </div>
 
     <!-- CHAT -->
@@ -945,12 +950,15 @@
     const vid = document.getElementById('remoteVideo');
     isFullscreen = !isFullscreen;
 
+    const closeBtn = document.getElementById('fsCloseBtn');
     if (isFullscreen) {
       vid.style.cssText = 'position:fixed;inset:0;width:100%!important;height:100%!important;z-index:9000;background:#000;object-fit:contain;';
       document.getElementById('fsIcon').innerHTML = '<path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>';
+      closeBtn.style.display = 'flex';
     } else {
       vid.style.cssText = '';
       document.getElementById('fsIcon').innerHTML = '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>';
+      closeBtn.style.display = 'none';
       if (vid.paused) vid.play().catch(() => {});
     }
   }

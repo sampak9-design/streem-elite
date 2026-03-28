@@ -718,7 +718,10 @@
 
   async function openBroker() {
     const video = document.getElementById('remoteVideo');
-    // Enter PiP so stream floats while user uses the broker
+    // Abrir ANTES do await — mobile bloqueia window.open após operações async
+    // Nome fixo 'nxt_broker' reutiliza a mesma aba em cliques subsequentes
+    window.open(BROKER_URL, 'nxt_broker');
+    // Entrar em PiP depois de abrir
     try {
       if (!document.pictureInPictureElement) {
         await video.requestPictureInPicture();
@@ -727,8 +730,6 @@
       console.warn('PiP error:', e);
     }
     if (video.paused) video.play().catch(() => {});
-    // Open broker in new tab
-    window.open(BROKER_URL, '_blank', 'noopener');
   }
 
   // Auto-enter PiP when user minimizes / switches tab

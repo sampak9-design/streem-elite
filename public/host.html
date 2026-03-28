@@ -761,6 +761,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
       Enquete
     </button>
+    <button class="ctrl-btn ctrl-ghost" id="btnSilent" onclick="toggleSilentMode()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+      Só host fala
+    </button>
     <div class="ctrl-sep"></div>
     <button class="ctrl-btn ctrl-live" id="btnGoLive" onclick="goLive()" disabled>
       <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><circle cx="12" cy="12" r="8"/></svg>
@@ -1436,6 +1440,23 @@
   function formatTime(ts) {
     const d=new Date(ts);
     return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+  }
+
+  // ── SILENT MODE ───────────────────────────────────────────────────────────
+  let silentMode = false;
+  function toggleSilentMode() {
+    silentMode = !silentMode;
+    socket.emit('host:silent-mode', { active: silentMode });
+    const btn = document.getElementById('btnSilent');
+    if (silentMode) {
+      btn.className = 'ctrl-btn ctrl-muted';
+      btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="23" y1="11" x2="17" y2="11"/></svg>Modo silêncio ●`;
+      addSystemMsg('🔇 Modo silêncio ativado — só o host pode falar');
+    } else {
+      btn.className = 'ctrl-btn ctrl-ghost';
+      btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="23" y1="11" x2="17" y2="11"/></svg>Só host fala`;
+      addSystemMsg('🔊 Modo silêncio desativado');
+    }
   }
 
   function esc(s) {

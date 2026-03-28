@@ -901,6 +901,29 @@
     showToast('✅ Chat reativado pelo host');
   });
 
+  socket.on('silent:mode', ({ active }) => {
+    const inp = document.getElementById('chatInput');
+    if (active) {
+      // Bloquear chat
+      inp.disabled = true;
+      inp.placeholder = '🔇 Somente o host pode falar agora';
+      // Bloquear mic
+      if (viewerMicStream) viewerMicStream.getAudioTracks().forEach(t => t.enabled = false);
+      if (viewerCamStream) viewerCamStream.getVideoTracks().forEach(t => t.enabled = false);
+      micEnabled = false; camEnabled = false;
+      document.getElementById('ctrlMic').classList.add('off');
+      document.getElementById('ctrlMic').classList.remove('active');
+      document.getElementById('ctrlCam').classList.add('off');
+      document.getElementById('ctrlCam').classList.remove('active');
+      document.getElementById('selfPreview').classList.remove('show');
+      showToast('🔇 Modo silêncio ativado pelo host');
+    } else {
+      inp.disabled = false;
+      inp.placeholder = 'Comentar...';
+      showToast('🔊 Modo silêncio desativado');
+    }
+  });
+
   function showToast(msg) {
     const t = document.createElement('div');
     t.style.cssText = 'position:fixed;top:70px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);color:#fff;padding:8px 18px;border-radius:20px;font-size:.8rem;font-weight:600;z-index:9999;white-space:nowrap;pointer-events:none;';

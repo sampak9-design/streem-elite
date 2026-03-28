@@ -39,7 +39,8 @@ io.on('connection', (socket) => {
       startTime: Date.now(),
       fakeViewers: 0,
       bannedWords: [],
-      poll: null
+      poll: null,
+      silentMode: false
     });
     socket.join(roomId);
     socket.roomId = roomId;
@@ -143,6 +144,7 @@ io.on('connection', (socket) => {
     const room = rooms.get(socket.roomId);
     if (!room || !message.trim()) return;
     if (socket.isViewer) {
+      if (room.silentMode) return;
       const viewer = room.viewers.get(socket.id);
       if (viewer && viewer.chatBanned) return;
     }
@@ -161,6 +163,17 @@ io.on('connection', (socket) => {
     if (room.chat.length > 500) room.chat.shift();
 
     io.to(socket.roomId).emit('chat:message', msg);
+  });
+
+  // ─── SILENT MODE ───────────────────────────────────────────────────────────
+
+  socket.on('host:silent-mode', ({ active }) => {
+    const room = rooms.get(socket.roomId);
+    if (!room || room.hostId !== socket.id) return;
+    room.silentMode = active;
+    // Notify all viewers
+    io.to(socket.roomId).emit('silent:mode', { active });
+    console.log(`[silent-mode] room ${socket.roomId} → ${active}`);
   });
 
   // ─── HOST ADMIN ACTIONS ────────────────────────────────────────────────────
